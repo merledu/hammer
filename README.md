@@ -19,6 +19,8 @@ Infrastructure to drive Spike (RISC-V ISA Simulator) in cosim mode. Hammer provi
 python3 -m pip install pybind11
 ```
 * Libraries and headers from Spike
+* Hammer was last tested with Spike commit `3349dc51`. Checkout this commit in
+  Spike before building.
 
 In the Spike repo run:
 
@@ -30,7 +32,7 @@ make
 make install
 ```
 
-The SHA of the last tested Spike version is included in the name of the patch file.
+Hammer was last tested with Spike commit `3349dc51`.
 
 ## Building Hammer and Running Tests
 
