@@ -42,15 +42,37 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   const char *bootargs = nullptr;
   bool real_time_clint = false;
   bool misaligned = false;
+  bool explicit_hartids =false;
 
   reg_t trigger_count = 4;
 
   reg_t num_pmpregions = 16;
 
+  reg_t pmpgranularity   = (1 << PMP_SHIFT);
+
+  reg_t cache_blocksz = 64;
+
   endianness_t endinaness = endianness_little;
 
-  cfg_t cfg = cfg_t(initrd_bounds, bootargs, isa, privilege_levels, vector_arch, misaligned, endinaness, num_pmpregions, memory_layout,
-                    hart_ids, real_time_clint, trigger_count);
+  // cfg_t cfg = cfg_t(initrd_bounds, bootargs, isa, privilege_levels, vector_arch, misaligned, endinaness, num_pmpregions, memory_layout,
+  //                   hart_ids, real_time_clint, trigger_count);
+
+  cfg_t cfg; // Spike Commit 6023896 revised the cfg_t class
+  // cfg.initrd_bounds    = initrd_bounds;
+  // cfg.bootargs         = bootargs;
+  // cfg.isa              = isa;
+  // cfg.priv             = privilege_levels;
+  // cfg.misaligned       = misaligned;
+  // cfg.endianness       = endinaness;
+  // cfg.pmpregions       = num_pmpregions;
+  // cfg.pmpgranularity   = pmpgranularity;
+  // cfg.mem_layout       = memory_layout;
+  // cfg.hartids          = hart_ids;
+  // cfg.explicit_hartids = explicit_hartids;
+  // cfg.real_time_clint  = real_time_clint;
+  // cfg.trigger_count    = trigger_count;
+  // cfg.cache_blocksz    = cache_blocksz;
+
 
   if (start_pc.has_value()) {
     cfg.start_pc = start_pc.value();
@@ -64,9 +86,12 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   bool halted = false;
   bool dtb_enabled = true;
   bool socket_enabled = false;
+  std::optional<unsigned long long> instructions = std::nullopt;
 
+  // simulator = new sim_t(&cfg, halted, mems, plugin_devices, htif_args, dm_config, log_path,
+  //                       dtb_enabled, dtb_file, socket_enabled, cmd_file);
   simulator = new sim_t(&cfg, halted, mems, plugin_devices, htif_args, dm_config, log_path,
-                        dtb_enabled, dtb_file, socket_enabled, cmd_file);
+                        dtb_enabled, dtb_file, socket_enabled, cmd_file,instructions);
 
   // Initializes everything
   simulator->start();
