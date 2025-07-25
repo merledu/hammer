@@ -12,8 +12,8 @@
 
 // FIXME: This function exists in Spike as a static function. We shouldn't have to
 // copy it out here but sim_t requires it as an argument.
-static std::vector<std::pair<reg_t, mem_t *>> make_mems(const std::vector<mem_cfg_t> &layout) {
-  std::vector<std::pair<reg_t, mem_t *>> mems;
+static std::vector<std::pair<reg_t, abstract_mem_t*>> make_mems(const std::vector<mem_cfg_t> &layout) {
+  std::vector<std::pair<reg_t, abstract_mem_t*>> mems;
   mems.reserve(layout.size());
   for (const auto &cfg : layout) {
     mems.push_back(std::make_pair(cfg.get_base(), new mem_t(cfg.get_size())));
@@ -26,6 +26,8 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                const std::string target_binary, const std::optional<uint64_t> start_pc) {
   // Expose these only if needed
   std::vector<std::pair<reg_t, abstract_device_t *>> plugin_devices;
+  std::vector<std::pair<const device_factory_t*, std::vector<std::string>>> plugin_device_factories;
+
   debug_module_config_t dm_config = {.progbufsize = 2,
                                      .max_sba_data_width = 0,
                                      .require_authentication = false,
@@ -38,21 +40,21 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   const char *dtb_file = nullptr;
   FILE *cmd_file = nullptr;
 
-  std::pair<reg_t, reg_t> initrd_bounds{0, 0};
-  const char *bootargs = nullptr;
-  bool real_time_clint = false;
-  bool misaligned = false;
-  bool explicit_hartids =false;
+  // std::pair<reg_t, reg_t> initrd_bounds{0, 0};
+  // const char *bootargs = nullptr;
+  // bool real_time_clint = false;
+  // bool misaligned = false;
+  // bool explicit_hartids =false;
 
-  reg_t trigger_count = 4;
+  // reg_t trigger_count = 4;
 
-  reg_t num_pmpregions = 16;
+  // reg_t num_pmpregions = 16;
 
-  reg_t pmpgranularity   = (1 << PMP_SHIFT);
+  // reg_t pmpgranularity   = (1 << PMP_SHIFT);
 
-  reg_t cache_blocksz = 64;
+  // reg_t cache_blocksz = 64;
 
-  endianness_t endinaness = endianness_little;
+  // endianness_t endinaness = endianness_little;
 
   // cfg_t cfg = cfg_t(initrd_bounds, bootargs, isa, privilege_levels, vector_arch, misaligned, endinaness, num_pmpregions, memory_layout,
   //                   hart_ids, real_time_clint, trigger_count);
@@ -60,14 +62,14 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   cfg_t cfg; // Spike Commit 6023896 revised the cfg_t class
   // cfg.initrd_bounds    = initrd_bounds;
   // cfg.bootargs         = bootargs;
-  // cfg.isa              = isa;
-  // cfg.priv             = privilege_levels;
+  cfg.isa              = isa;
+  cfg.priv             = privilege_levels;
   // cfg.misaligned       = misaligned;
   // cfg.endianness       = endinaness;
   // cfg.pmpregions       = num_pmpregions;
   // cfg.pmpgranularity   = pmpgranularity;
-  // cfg.mem_layout       = memory_layout;
-  // cfg.hartids          = hart_ids;
+  cfg.mem_layout       = memory_layout;
+  cfg.hartids          = hart_ids;
   // cfg.explicit_hartids = explicit_hartids;
   // cfg.real_time_clint  = real_time_clint;
   // cfg.trigger_count    = trigger_count;
@@ -78,7 +80,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
     cfg.start_pc = start_pc.value();
   }
 
-  std::vector<std::pair<reg_t, mem_t *>> mems = make_mems(memory_layout);
+  std::vector<std::pair<reg_t, abstract_mem_t*>> mems = make_mems(memory_layout);
 
   std::vector<std::string> htif_args;
   htif_args.push_back(target_binary);
@@ -90,7 +92,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
 
   // simulator = new sim_t(&cfg, halted, mems, plugin_devices, htif_args, dm_config, log_path,
   //                       dtb_enabled, dtb_file, socket_enabled, cmd_file);
-  simulator = new sim_t(&cfg, halted, mems, plugin_devices, htif_args, dm_config, log_path,
+  simulator = new sim_t(&cfg, halted, mems, plugin_device_factories, htif_args, dm_config, log_path,
                         dtb_enabled, dtb_file, socket_enabled, cmd_file,instructions);
 
   // Initializes everything

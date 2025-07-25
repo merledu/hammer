@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
-
+// #define _GNU_SOURCE        // redundant but harmless alongside the -D flag
+#include <sys/syscall.h>   // brings in SYS_futex on glibc
+// #include <linux/futex.h>   // (optional) gives FUTEX_* enums if you ever need them 
 #include "hammer_enums.h"
+#include "riscv/devices.h"        // device_factory_t
 #include "riscv/mmu.h"
 #include "riscv/sim.h"
 

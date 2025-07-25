@@ -10,6 +10,13 @@ project('hammer lib', 'cpp',
           'default_library=static'
           ]
         )
+add_project_arguments(
+  ['-D_GNU_SOURCE',
+   '-Wno-error=unused-variable',
+   '-Wno-error=unused-parameter'],
+  language: 'cpp')
+# Added additionally 
+
 
 spike_install_dir = get_option('spike_install_dir')
 
