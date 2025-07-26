@@ -21,20 +21,22 @@ def main():
     elf = sys.argv[1]
     print(f"Loading ELF: {elf}")
 
-    # Instantiate Spike via Hammer
+    mem_cfg = hammer.mem_cfg_t(0x80000000, 256 * 1024 * 1024)
+
     sim = hammer.Hammer(
-        isa="RV32IMC",
-        privilege_levels="msu",
-        vector_arch="",
-        hart_ids=[0],
-        memory_layout=[(0x80000000, 256 * 1024 * 1024)],  # 256 MiB @ DRAM base
-        target_binary=elf
+        "RV32IMC",          # arg0: isa
+        "msu",              # arg1: privilege_levels  
+        "",                 # arg2: vector_arch
+        [0],                # arg3: hart_ids
+        [mem_cfg],          # arg4: memory_layout (sequence of mem_cfg_t)
+        elf,                # arg5: target_binary
+        None                # arg6: start_pc (optional)
     )
 
     print("Initial PC:", hex(sim.get_PC(0)))
 
     # Step through first 10 instructions
-    for i in range(10):
+    for i in range(350):
         sim.single_step(0)
         pc  = sim.get_PC(0)
         a0  = sim.get_gpr(0, 10)   # x10/a0
