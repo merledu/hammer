@@ -36,7 +36,8 @@ def main():
     print("Initial PC:", hex(sim.get_PC(0)))
 
     # Step through first 10 instructions
-    for i in range(200):
+    for i in range(300):
+        hart=0
 
         pc  = sim.get_PC(0)
         insn_hex = sim.get_insn_hex(0, pc)
@@ -46,11 +47,15 @@ def main():
         rd  = sim.get_rd_addr(0, pc)
         csr = sim.get_csr_addr(0, pc)
         csr_val = sim.get_csr(0, csr)
+        length = sim.get_insn_length(0, pc)
+        enable = sim.get_log_commits_enabled(0)
         # Handle optional CSR value (None if invalid CSR)
         if csr_val is None:
             csr_val = "N/A"
 
         sim.single_step(0)
+        
+
         a0  = sim.get_gpr(0, 10)   # x10/a0
         val_a = sim.get_memory_at_VA(0, 0x8000bc48, 4, 1)
         val = 0
@@ -58,7 +63,8 @@ def main():
             for byte_value in val_a:
                 val |= (byte_value << (val_a.index(byte_value) * 8))
         
-        print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x} rs1={rs1} rs2={rs2} rs3={rs3} rd={rd} csr={csr} csr_val={csr_val} ")
+        print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x}")
+        sim.get_log_reg_writes(0)  # Dump the state of hart 0
         memory_contents = sim.get_memory_at_VA(0, 0x80002000, 4, 1)
         value_at_address = 0
         x = 0

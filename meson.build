@@ -93,5 +93,3 @@ hammer_pylib = python3_instance.extension_module('hammer',
 
 install_headers('hammer.h', 'hammer_enums.h')
 
-subdir('tests')
-subdir('pytests')

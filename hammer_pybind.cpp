@@ -19,6 +19,8 @@ PYBIND11_MODULE(hammer, m) {
                           std::vector<mem_cfg_t>, const std::string,
                           const std::optional<uint64_t>>())
       .def("hello_world", &Hammer::hello_world)
+      .def("get_log_commits_enabled",&Hammer::get_log_commits_enabled)
+
       .def("get_insn_hex",&Hammer::get_insn_hex)
       .def("get_insn",&Hammer::get_insn)
       .def("get_insn_length",&Hammer::get_insn_length)
@@ -28,6 +30,18 @@ PYBIND11_MODULE(hammer, m) {
       .def("get_rs3_addr",&Hammer::get_rs3_addr)
       .def("get_rd_addr",&Hammer::get_rd_addr)
       .def("get_csr_addr",&Hammer::get_csr_addr)
+
+      //RVC
+      .def("get_rvc_opcode",&Hammer::get_rvc_opcode)
+      .def("get_rvc_rs1_addr",&Hammer::get_rvc_rs1_addr)
+      .def("get_rvc_rs2_addr",&Hammer::get_rvc_rs2_addr)
+      .def("get_rvc_rd_addr",&Hammer::get_rvc_rd_addr)
+
+      .def("get_memory_address",&Hammer::get_memory_address)
+      .def("get_memory_read_data",&Hammer::get_memory_read_data)
+      .def("get_memory_write_data",&Hammer::get_memory_write_data)
+      .def("get_log_reg_writes",&Hammer::get_log_reg_writes)
+
       
       .def("get_gpr", &Hammer::get_gpr)
       .def("set_gpr", &Hammer::set_gpr)

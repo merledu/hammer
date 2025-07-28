@@ -10,6 +10,7 @@
 
 #include <vector>
 
+
 // FIXME: This function exists in Spike as a static function. We shouldn't have to
 // copy it out here but sim_t requires it as an argument.
 static std::vector<std::pair<reg_t, abstract_mem_t*>> make_mems(const std::vector<mem_cfg_t> &layout) {
@@ -103,6 +104,12 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
 }
 
 Hammer::~Hammer() { delete simulator; }
+
+bool Hammer::get_log_commits_enabled(uint8_t hart_id){
+  processor_t *hart = simulator->get_core(hart_id);
+  return hart->get_log_commits_enabled();
+}
+
 // Instruction metadata
 insn_fetch_t Hammer::get_insn_fetch(uint8_t hart_id,reg_t pc){
   processor_t *hart = simulator->get_core(hart_id);
@@ -120,24 +127,149 @@ insn_bits_t Hammer::get_insn_hex(uint8_t hart_id,reg_t pc){
 int Hammer::get_insn_length(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.length();
 }
-u_int64_t Hammer::get_opcode(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_opcode(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.opcode();
 }
 
-u_int64_t Hammer::get_rs1_addr(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_rs1_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.rs1();
 }
-u_int64_t Hammer::get_rs2_addr(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_rs2_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.rs2();
 }
-u_int64_t Hammer::get_rs3_addr(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_rs3_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.rs3();
 }
-u_int64_t Hammer::get_rd_addr(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_rd_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.rd();
 }
-u_int64_t Hammer::get_csr_addr(uint8_t hart_id,reg_t pc){
+uint64_t Hammer::get_csr_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.csr();
+}
+
+// RVC instructions metadata
+uint64_t Hammer::get_rvc_opcode(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rvc_opcode();
+}
+uint64_t Hammer::get_rvc_rs1_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rvc_rs1();
+}
+
+uint64_t Hammer::get_rvc_rs2_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rvc_rs2();
+}
+
+uint64_t Hammer::get_rvc_rd_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rvc_rd();
+}
+
+std::optional<reg_t> Hammer::get_memory_address(uint8_t hart_id) {
+  //If a load or store happened (not li or any immediate) , we can check the 
+  processor_t *hart = simulator->get_core(hart_id);
+  commit_log_reg_t reg_write =hart->get_state()->log_reg_write;
+  commit_log_mem_t mem_read = hart->get_state()->log_mem_read;
+  commit_log_mem_t mem_write = hart->get_state()->log_mem_write;
+  if (!mem_read.empty()) {
+    return std::get<0>(mem_read[0]); // addr from tuple<addr, value, size>
+  }
+  if (!mem_write.empty()) {
+    return std::get<0>(mem_write[0]);
+  }
+  return std::nullopt;
+}
+
+std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t hart_id){
+  processor_t *hart = simulator->get_core(hart_id);
+  commit_log_reg_t reg = hart->get_state()->log_reg_write;
+  int xlen = hart->get_xlen();
+  int flen = hart->get_flen();
+  bool show_vec = false;
+  
+  std::vector<std::pair<std::string, uint64_t>> result;
+  
+  for (auto item : reg) {
+    if (item.first == 0)
+      continue;
+
+    char prefix = ' ';
+    int size;
+    int rd = item.first >> 4;
+    bool is_vec = false;
+    bool is_vreg = false;
+    
+    // Determine register type and size (same logic as Spike)
+    switch (item.first & 0xf) {
+    case 0:
+      size = xlen;
+      prefix = 'x';
+      break;
+    case 1:
+      size = flen;
+      prefix = 'f';
+      break;
+    case 2:
+      size = hart->VU.get_vlen();
+      prefix = 'v';
+      is_vreg = true;
+      break;
+    case 3:
+      is_vec = true;
+      break;
+    case 4:
+      size = xlen;
+      prefix = 'c';
+      break;
+    default:
+      continue; // Skip unknown register types
+    }
+    // NOT RELEVANT FOR RV32IMC
+    if (!show_vec && (is_vreg || is_vec)) {
+        // some fprintf
+        show_vec = true;
+    }
+
+    if (!is_vec) {
+      // Create register name
+      std::string reg_name = std::string(1, prefix) + std::to_string(rd);
+      
+      // Extract the integer value directly from the register data
+      uint64_t int_value = 0;
+      if (size <= 64) {
+        // For 32-bit and 64-bit registers, use v[0]
+        int_value = item.second.v[0];
+        if (size == 32) {
+          // For 32-bit registers, mask to 32 bits
+          int_value &= 0xFFFFFFFF;
+        }
+      } else {
+        // For larger registers (like 128-bit), combine v[0] and v[1]
+        int_value = item.second.v[0] | (static_cast<uint64_t>(item.second.v[1]) << 32);
+      }
+      
+      // std::cout<<"Reg"<<" "<<reg_name<<" "<<"Value:"<<std::hex<<"0x"<<int_value<<std::dec<<std::endl;
+      result.emplace_back(reg_name, int_value);
+    }
+  }
+  
+  return result;
+}
+
+std::optional<uint64_t> Hammer::get_memory_read_data(uint8_t hart_id) {
+  processor_t *hart = simulator->get_core(hart_id);
+  auto& mem_read = hart->get_state()->log_mem_read;
+  if (!mem_read.empty()) {
+    return std::get<1>(mem_read[0]); // value from tuple
+  }
+  return std::nullopt;
+}
+//tuple has <addr,val,hexe>
+std::optional<uint64_t> Hammer::get_memory_write_data(uint8_t hart_id) {
+  processor_t *hart = simulator->get_core(hart_id);
+  auto& mem_write = hart->get_state()->log_mem_write;
+  if (!mem_write.empty()) {
+    return std::get<1>(mem_write[0]); // value from tuple
+  }
+  return std::nullopt;
 }
 
 

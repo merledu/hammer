@@ -19,17 +19,35 @@ class Hammer {
          std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
          const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
   ~Hammer();
-  insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
+
+  bool get_log_commits_enabled(uint8_t hart_id);
+
   insn_t get_insn(uint8_t hart_id,reg_t pc);
   int get_insn_length(uint8_t hart_id,reg_t pc);
+  insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
   u_int64_t get_opcode(uint8_t hart_id,reg_t pc);
   u_int64_t get_rs1_addr(uint8_t hart_id,reg_t pc);
   u_int64_t get_rs2_addr(uint8_t hart_id,reg_t pc);
   u_int64_t get_rs3_addr(uint8_t hart_id,reg_t pc);
   u_int64_t get_rd_addr(uint8_t hart_id,reg_t pc);
   u_int64_t get_csr_addr(uint8_t hart_id,reg_t pc);
-
-
+  
+  //RVC instructions
+  u_int64_t get_rvc_opcode(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rs1_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rs2_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rd_addr(uint8_t hart_id,reg_t pc);
+  
+  std::optional<reg_t> get_memory_address(uint8_t hart_id);
+  std::optional<uint64_t> get_memory_read_data(uint8_t hart_id);
+  std::optional<uint64_t> get_memory_write_data(uint8_t hart_id);
+  // void dump(uint8_t hart_id);
+  
+  // Detailed register write logging (like Spike's commit log)
+  std::vector<std::pair<std::string, uint64_t>> get_log_reg_writes(uint8_t hart_id);
+  
+  
+  
   reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
   void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
 
