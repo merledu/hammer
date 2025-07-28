@@ -20,6 +20,16 @@ class Hammer {
          const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
   ~Hammer();
   insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
+  insn_t get_insn(uint8_t hart_id,reg_t pc);
+  int get_insn_length(uint8_t hart_id,reg_t pc);
+  u_int64_t get_opcode(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs1_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs2_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs3_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rd_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_csr_addr(uint8_t hart_id,reg_t pc);
+
+
   reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
   void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
 
@@ -28,7 +38,7 @@ class Hammer {
   reg_t get_PC(uint8_t hart_id);
   void set_PC(uint8_t hart_id, reg_t new_pc_value);
 
-  reg_t get_csr(uint8_t hart_id, uint32_t csr_id);
+  std::optional<reg_t> get_csr(uint8_t hart_id, uint32_t csr_id);
 
   void single_step(uint8_t hart_id);
 
@@ -74,5 +84,5 @@ class Hammer {
 
  private:
   sim_t *simulator;
-  insn_fetch_t get_insn(uint8_t hart_id,reg_t pc);
+  insn_fetch_t get_insn_fetch(uint8_t hart_id,reg_t pc);
 };

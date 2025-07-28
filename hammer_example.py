@@ -36,10 +36,20 @@ def main():
     print("Initial PC:", hex(sim.get_PC(0)))
 
     # Step through first 10 instructions
-    for i in range(20):
+    for i in range(200):
 
         pc  = sim.get_PC(0)
         insn_hex = sim.get_insn_hex(0, pc)
+        rs1 = sim.get_rs1_addr(0, pc)
+        rs2 = sim.get_rs2_addr(0, pc)
+        rs3 = sim.get_rs3_addr(0, pc)
+        rd  = sim.get_rd_addr(0, pc)
+        csr = sim.get_csr_addr(0, pc)
+        csr_val = sim.get_csr(0, csr)
+        # Handle optional CSR value (None if invalid CSR)
+        if csr_val is None:
+            csr_val = "N/A"
+
         sim.single_step(0)
         a0  = sim.get_gpr(0, 10)   # x10/a0
         val_a = sim.get_memory_at_VA(0, 0x8000bc48, 4, 1)
@@ -48,7 +58,7 @@ def main():
             for byte_value in val_a:
                 val |= (byte_value << (val_a.index(byte_value) * 8))
         
-        print(f"Step {i+1:02d}: pc={pc:#x}  a0={a0:#x} insn={insn_hex:#x}  ")
+        print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x} rs1={rs1} rs2={rs2} rs3={rs3} rd={rd} csr={csr} csr_val={csr_val} ")
         memory_contents = sim.get_memory_at_VA(0, 0x80002000, 4, 1)
         value_at_address = 0
         x = 0

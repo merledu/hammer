@@ -103,15 +103,41 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
 }
 
 Hammer::~Hammer() { delete simulator; }
-
-insn_fetch_t Hammer::get_insn(uint8_t hart_id,reg_t pc){
+// Instruction metadata
+insn_fetch_t Hammer::get_insn_fetch(uint8_t hart_id,reg_t pc){
   processor_t *hart = simulator->get_core(hart_id);
   mmu_t *mmu = hart->get_mmu();
   insn_fetch_t fetch = mmu->load_insn(pc);
   return fetch;
 }
+
+insn_t Hammer::get_insn(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn;
+}
 insn_bits_t Hammer::get_insn_hex(uint8_t hart_id,reg_t pc){
-  return get_insn(hart_id,pc).insn.length();
+  return get_insn_fetch(hart_id,pc).insn.bits();
+}
+int Hammer::get_insn_length(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.length();
+}
+u_int64_t Hammer::get_opcode(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.opcode();
+}
+
+u_int64_t Hammer::get_rs1_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rs1();
+}
+u_int64_t Hammer::get_rs2_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rs2();
+}
+u_int64_t Hammer::get_rs3_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rs3();
+}
+u_int64_t Hammer::get_rd_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.rd();
+}
+u_int64_t Hammer::get_csr_addr(uint8_t hart_id,reg_t pc){
+  return get_insn_fetch(hart_id,pc).insn.csr();
 }
 
 
@@ -159,9 +185,14 @@ void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {
   hart_state->pc = new_pc_value;
 }
 
-reg_t Hammer::get_csr(uint8_t hart_id, uint32_t csr_id) {
+std::optional<reg_t> Hammer::get_csr(uint8_t hart_id, uint32_t csr_id) {
   processor_t *hart = simulator->get_core(hart_id);
-  return hart->get_csr(csr_id);
+  try {
+    return hart->get_csr(csr_id);
+  } catch (...) {
+    // Return nullopt for invalid/non-existent CSRs
+    return std::nullopt;
+  }
 }
 
 void Hammer::single_step(uint8_t hart_id) {
