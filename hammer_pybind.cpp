@@ -41,6 +41,8 @@ PYBIND11_MODULE(hammer, m) {
       .def("get_memory_read_data",&Hammer::get_memory_read_data)
       .def("get_memory_write_data",&Hammer::get_memory_write_data)
       .def("get_log_reg_writes",&Hammer::get_log_reg_writes)
+      .def("get_log_mem_reads",&Hammer::get_log_mem_reads)
+      .def("get_log_mem_writes",&Hammer::get_log_mem_writes)
 
       
       .def("get_gpr", &Hammer::get_gpr)

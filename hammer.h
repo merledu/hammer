@@ -45,6 +45,8 @@ class Hammer {
   
   // Detailed register write logging (like Spike's commit log)
   std::vector<std::pair<std::string, uint64_t>> get_log_reg_writes(uint8_t hart_id);
+  commit_log_mem_t get_log_mem_reads(uint8_t hart_id);
+  commit_log_mem_t get_log_mem_writes(uint8_t hart_id);
   
   
   

@@ -181,8 +181,8 @@ std::optional<reg_t> Hammer::get_memory_address(uint8_t hart_id) {
 std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t hart_id){
   processor_t *hart = simulator->get_core(hart_id);
   commit_log_reg_t reg = hart->get_state()->log_reg_write;
-  int xlen = hart->get_xlen();
-  int flen = hart->get_flen();
+  int xlen = hart->get_state()->last_inst_xlen;
+  int flen = hart->get_state()->last_inst_flen;
   bool show_vec = false;
   
   std::vector<std::pair<std::string, uint64_t>> result;
@@ -253,6 +253,52 @@ std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t
   
   return result;
 }
+commit_log_mem_t Hammer::get_log_mem_reads(uint8_t hart_id){
+    commit_log_mem_t result;
+    processor_t *hart = simulator->get_core(hart_id);
+    commit_log_mem_t load = hart->get_state()->log_mem_read;
+    
+    if (!load.empty()) {
+        // std::cout << "=== MEMORY READS for PC: 0x" << std::hex << get_PC(hart_id) << std::dec << " ===" << std::endl;
+    }
+    
+    //address,data,size
+    for (auto item : load) {
+      // item is a tuple: <address, value, size>
+      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
+      uint64_t value = std::get<1>(item);
+      uint8_t size = std::get<2>(item);
+      
+      // std::cout<<std::hex<<"ADDR 0x"<<addr<<" value 0x"<<value<<" size "<<std::dec<<(int)size<<" bytes"<<std::endl;
+      // Add to result as a tuple
+      result.emplace_back(addr, value, size);
+    }
+    return result;
+
+}
+
+commit_log_mem_t Hammer::get_log_mem_writes(uint8_t hart_id){
+    commit_log_mem_t result;
+    processor_t *hart = simulator->get_core(hart_id);
+    commit_log_mem_t store = hart->get_state()->log_mem_write;
+    
+    // if (!store.empty()) {
+    //     std::cout << "=== MEMORY WRITES ===" << std::endl;
+    // }
+    
+    //address,data,size
+    for (auto item : store) {
+      // item is a tuple: <address, value, size>
+      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
+      uint64_t value = std::get<1>(item);
+      uint8_t size = std::get<2>(item);
+      
+      // std::cout<<std::hex<<"WRITE ADDR 0x"<<addr<<" value 0x"<<value<<" size "<<std::dec<<(int)size<<" bytes"<<std::endl;
+      // Add to result as a tuple
+      result.emplace_back(addr, value, size);
+    }
+    return result;
+}
 
 std::optional<uint64_t> Hammer::get_memory_read_data(uint8_t hart_id) {
   processor_t *hart = simulator->get_core(hart_id);
@@ -307,7 +353,7 @@ reg_t Hammer::get_PC(uint8_t hart_id) {
   processor_t *hart = simulator->get_core(hart_id);
   state_t *hart_state = hart->get_state();
 
-  return hart_state->pc;
+  return hart_state->pc  & 0xFFFFFFFF;
 }
 
 void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {

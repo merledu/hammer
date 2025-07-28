@@ -64,7 +64,23 @@ def main():
                 val |= (byte_value << (val_a.index(byte_value) * 8))
         
         print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x}")
-        sim.get_log_reg_writes(0)  # Dump the state of hart 0
+        reg_writes=sim.get_log_reg_writes(0)  # Dump the state of hart 0
+        if reg_writes:
+            print("=== REGISTER WRITES ===")
+            for reg, value in reg_writes:
+                print(f"WRITE REG: {reg}, VALUE: {value:#x}")
+
+        mem_reads=sim.get_log_mem_reads(0)
+        if mem_reads and len(mem_reads) > 4:
+            print("=== MEMORY READS ===")
+            for addr, value, size in mem_reads :
+                print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
+                break
+        mem_writes=sim.get_log_mem_writes(0)
+        if mem_writes:
+            print("=== MEMORY WRITES ===")
+            for addr, value, size in mem_writes:
+                print(f"WRITE ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
         memory_contents = sim.get_memory_at_VA(0, 0x80002000, 4, 1)
         value_at_address = 0
         x = 0
