@@ -19,7 +19,7 @@ class Hammer {
          std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
          const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
   ~Hammer();
-
+  insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
   reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
   void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
 
@@ -74,4 +74,5 @@ class Hammer {
 
  private:
   sim_t *simulator;
+  insn_fetch_t get_insn(uint8_t hart_id,reg_t pc);
 };

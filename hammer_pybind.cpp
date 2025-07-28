@@ -19,6 +19,7 @@ PYBIND11_MODULE(hammer, m) {
                           std::vector<mem_cfg_t>, const std::string,
                           const std::optional<uint64_t>>())
       .def("hello_world", &Hammer::hello_world)
+      .def("get_insn_hex",&Hammer::get_insn_hex)
       .def("get_gpr", &Hammer::get_gpr)
       .def("set_gpr", &Hammer::set_gpr)
       .def("get_fpr", &Hammer::get_fpr)

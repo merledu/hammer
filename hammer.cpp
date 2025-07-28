@@ -36,7 +36,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                                      .support_abstract_csr_access = true,
                                      .support_haltgroups = true,
                                      .support_impebreak = true};
-  const char *log_path = nullptr;
+  const char *log_path = "ham.log";
   const char *dtb_file = nullptr;
   FILE *cmd_file = nullptr;
 
@@ -96,10 +96,26 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                         dtb_enabled, dtb_file, socket_enabled, cmd_file,instructions);
 
   // Initializes everything
+  bool enable_log=false;
+  bool enable_commitlog=true;
+  simulator->configure_log(enable_log,enable_commitlog);
   simulator->start();
 }
 
 Hammer::~Hammer() { delete simulator; }
+
+insn_fetch_t Hammer::get_insn(uint8_t hart_id,reg_t pc){
+  processor_t *hart = simulator->get_core(hart_id);
+  mmu_t *mmu = hart->get_mmu();
+  insn_fetch_t fetch = mmu->load_insn(pc);
+  return fetch;
+}
+insn_bits_t Hammer::get_insn_hex(uint8_t hart_id,reg_t pc){
+  return get_insn(hart_id,pc).insn.length();
+}
+
+
+
 
 reg_t Hammer::get_gpr(uint8_t hart_id, uint8_t gpr_id) {
   assert(gpr_id < NXPR);
