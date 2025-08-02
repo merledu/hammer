@@ -287,7 +287,7 @@ Expect a short trace of `PC`, raw instruction, decoded opcode, plus an updated `
 
 ---
 
-## 6 · Known Limitations / TODO
+## 6 · Known Limitations 
 
 * Only tested on **RV32IMC**; RV64 helpers compile but lack CI.
 * Memory helpers show the last address/data pair seen by the MMU this cycle; concurrent load‑store contention on multi‑harts is **not** exposed yet.
