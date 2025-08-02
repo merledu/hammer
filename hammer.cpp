@@ -37,7 +37,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                                      .support_abstract_csr_access = true,
                                      .support_haltgroups = true,
                                      .support_impebreak = true};
-  const char *log_path = "ham.log";
+  const char *log_path = "../ham.log";
   const char *dtb_file = nullptr;
   FILE *cmd_file = nullptr;
 
@@ -163,21 +163,6 @@ uint64_t Hammer::get_rvc_rd_addr(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn.rvc_rd();
 }
 
-std::optional<reg_t> Hammer::get_memory_address(uint8_t hart_id) {
-  //If a load or store happened (not li or any immediate) , we can check the 
-  processor_t *hart = simulator->get_core(hart_id);
-  commit_log_reg_t reg_write =hart->get_state()->log_reg_write;
-  commit_log_mem_t mem_read = hart->get_state()->log_mem_read;
-  commit_log_mem_t mem_write = hart->get_state()->log_mem_write;
-  if (!mem_read.empty()) {
-    return std::get<0>(mem_read[0]); // addr from tuple<addr, value, size>
-  }
-  if (!mem_write.empty()) {
-    return std::get<0>(mem_write[0]);
-  }
-  return std::nullopt;
-}
-
 std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t hart_id){
   processor_t *hart = simulator->get_core(hart_id);
   commit_log_reg_t reg = hart->get_state()->log_reg_write;
@@ -224,7 +209,7 @@ std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t
     }
     // NOT RELEVANT FOR RV32IMC
     if (!show_vec && (is_vreg || is_vec)) {
-        // some fprintf
+        // log write 
         show_vec = true;
     }
 
@@ -258,9 +243,9 @@ commit_log_mem_t Hammer::get_log_mem_reads(uint8_t hart_id){
     processor_t *hart = simulator->get_core(hart_id);
     commit_log_mem_t load = hart->get_state()->log_mem_read;
     
-    if (!load.empty()) {
-        // std::cout << "=== MEMORY READS for PC: 0x" << std::hex << get_PC(hart_id) << std::dec << " ===" << std::endl;
-    }
+    // if (!load.empty()) {
+    //     std::cout << "=== MEMORY READS for PC: 0x" << std::hex << get_PC(hart_id) << std::dec << " ===" << std::endl;
+    // }
     
     //address,data,size
     for (auto item : load) {
@@ -299,25 +284,6 @@ commit_log_mem_t Hammer::get_log_mem_writes(uint8_t hart_id){
     }
     return result;
 }
-
-std::optional<uint64_t> Hammer::get_memory_read_data(uint8_t hart_id) {
-  processor_t *hart = simulator->get_core(hart_id);
-  auto& mem_read = hart->get_state()->log_mem_read;
-  if (!mem_read.empty()) {
-    return std::get<1>(mem_read[0]); // value from tuple
-  }
-  return std::nullopt;
-}
-//tuple has <addr,val,hexe>
-std::optional<uint64_t> Hammer::get_memory_write_data(uint8_t hart_id) {
-  processor_t *hart = simulator->get_core(hart_id);
-  auto& mem_write = hart->get_state()->log_mem_write;
-  if (!mem_write.empty()) {
-    return std::get<1>(mem_write[0]); // value from tuple
-  }
-  return std::nullopt;
-}
-
 
 
 

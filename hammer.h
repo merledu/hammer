@@ -38,11 +38,6 @@ class Hammer {
   u_int64_t get_rvc_rs2_addr(uint8_t hart_id,reg_t pc);
   u_int64_t get_rvc_rd_addr(uint8_t hart_id,reg_t pc);
   
-  std::optional<reg_t> get_memory_address(uint8_t hart_id);
-  std::optional<uint64_t> get_memory_read_data(uint8_t hart_id);
-  std::optional<uint64_t> get_memory_write_data(uint8_t hart_id);
-  // void dump(uint8_t hart_id);
-  
   // Detailed register write logging (like Spike's commit log)
   std::vector<std::pair<std::string, uint64_t>> get_log_reg_writes(uint8_t hart_id);
   commit_log_mem_t get_log_mem_reads(uint8_t hart_id);

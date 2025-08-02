@@ -21,7 +21,7 @@ def main():
     elf = sys.argv[1]
     print(f"Loading ELF: {elf}")
 
-    mem_cfg = hammer.mem_cfg_t(0x80000000, 256 * 1024 * 1024)
+    mem_cfg = hammer.mem_cfg_t(hammer.DramBase, 256 * 1024 * 1024)
 
     sim = hammer.Hammer(
         "RV32IMC",          # arg0: isa

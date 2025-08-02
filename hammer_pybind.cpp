@@ -36,10 +36,7 @@ PYBIND11_MODULE(hammer, m) {
       .def("get_rvc_rs1_addr",&Hammer::get_rvc_rs1_addr)
       .def("get_rvc_rs2_addr",&Hammer::get_rvc_rs2_addr)
       .def("get_rvc_rd_addr",&Hammer::get_rvc_rd_addr)
-
-      .def("get_memory_address",&Hammer::get_memory_address)
-      .def("get_memory_read_data",&Hammer::get_memory_read_data)
-      .def("get_memory_write_data",&Hammer::get_memory_write_data)
+        
       .def("get_log_reg_writes",&Hammer::get_log_reg_writes)
       .def("get_log_mem_reads",&Hammer::get_log_mem_reads)
       .def("get_log_mem_writes",&Hammer::get_log_mem_writes)
