@@ -1,3 +1,344 @@
+diff --git a/.gitignore b/.gitignore
+index dd96872..6152bc0 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -3,3 +3,5 @@
+ # SPDX-License-Identifier: Apache-2.0
+ 
+ .vscode
++
++ham.log
+\ No newline at end of file
+diff --git a/HAMMER.md b/HAMMER.md
+new file mode 100644
+index 0000000..3fcb789
+--- /dev/null
++++ b/HAMMER.md
+@@ -0,0 +1,324 @@
++# Documentation on Hammer & Modifying it for Our Use Case
++
++**Date:** July 31, 2025
++
++**Latest Hammer Commit:** 6d9fac96407149a1a533cdd3f63f6bbd96614ffa
++
++Hammer is an infrastructure to drive Spike (the RISC-V ISA Simulator) in co-simulation mode, designed by Rivos. It provides both C++ and Python interfaces to interact with Spike, enabling detailed instruction-level simulation, tracing, and analysis for RISC-V software and hardware development. Hammer is especially useful for co-simulation, debugging, and automated test environments.
++
++The source code is available here: [https://github.com/rivosinc/hammer](https://github.com/rivosinc/hammer)
++
++Hammer leverages `pybind` to provide a Python interface, using Spike’s executables and shared libraries to enable seamless integration between Python and C++. This allows users to script, automate, and analyze RISC-V simulation runs directly from Python, while still having access to the full power of Spike's C++ backend.
++
++`meson` is the build infrastructure used to build the Hammer source code and execute it. This ensures a modern, fast, and reproducible build process.
++
++The main sections in this repo are:
++
++- `hammer.h`  — Contains the Hammer class definition and API
++- `hammer.cpp` — Implementation of the Hammer class and core logic
++- `hammer_enums.h` — Enumerations for register types, privilege levels, etc.
++- `hammer_pybind.cpp` — Python bindings using pybind11
++
++---
++
++### Features
++
++- Single-step and batch instruction execution
++- Python and C++ APIs for scripting and automation
++- Support for custom extensions and modifications
++
++---
++
++### Build & Installation
++
++Hammer uses `meson` as its build infrastructure.
++The build steps can be found at the Hammer repository.
++Refer to it [here](https://github.com/rivosinc/hammer/blob/main/README.md)
++
++### Command to Run Tests
++
++To run the tests:
++
++```sh
++meson test -C builddir
++```
++
++This command compiles the test input files into ELF binaries using a RISC-V toolchain and executes them through the Meson test framework.
++
++## Common Build Errors
++
++## NOTE
++
++The command `meson test -C builddir` has **not been successfully tested** in this environment.
++
++> **This is because it requires:**
++>
++> - A RISC-V GCC toolchain that supports the `rv64gcv` ISA (including vector instructions).
++> - Properly formatted linker scripts that avoid using unsupported syntax (e.g., `#` for comments).
++>
++> Without these prerequisites, test compilation and execution will fail due to assembler or linker errors.
++
++---
++
++## Usage
++
++The current functionalities exposed through the interface include:
++
++- Instantiating a Hammer object in `Python` which initializes the Spike simulator and preloads the ELF File.
++
++  ```python
++  import builddir.hammer as pyhammer
++  hammer = pyhammer.Hammer("RV64GCV", "MSU", "vlen:512,elen:64", hart_ids, [mem_layout], elf_name, None)
++  ```
++
++  - Another example in `Python`:
++
++  ```python
++  import builddir.hammer as pyhammer
++  mem_cfg = pyhammer.mem_cfg_t(pyhammer.DramBase, 256 * 1024 * 1024)
++  hammer = pyhammer.Hammer("RV32IMC", "msu", "", hart_ids, [mem_cfg], target_binary, None)
++  ```
++- Instantiating a Hammer object in `C++` which initializes the Spike simulator and preloads the ELF File.
++
++  ```cpp
++  Hammer(const char *isa, const char *privilege_levels, const char *vector_arch,
++         std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
++         const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt)
++  ```
++
++  - Example snippet in `C++`:
++
++  ```cpp
++  std::vector<mem_cfg_t> memory_layout;
++  // This is what Spike sets it to
++  memory_layout.push_back(mem_cfg_t(reg_t(DRAM_BASE), reg_t(2048) << 20));
++
++  std::vector<size_t> hart_ids{0};
++  Hammer hammer = Hammer("RV64GCV", "MSU", "vlen:512,elen:32", hart_ids, memory_layout,
++                         target_binary, std::nullopt);
++  ```
++
++Some more example snippets in `C++` can be found in `hammer/tests` and `hammer/pytests` for `Python`.
++
++### Exposed Functionalities
++
++- **get_gpr / set_gpr**: Read or write the value of a general-purpose register (GPR) for a specific hardware thread (hart).
++- **get_fpr**: Retrieve the value of a floating-point register (FPR) for a given hart.
++- **get_PC / set_PC**: Get or set the program counter (PC) for a specified hart.
++  **NOTE:** The `get_PC` returns pc address which points to the next instruction to be executed, not the current instruction that has been executed.
++- **get_csr**: Access the value of a control and status register (CSR) for a particular hart.
++- **single_step**: Execute a single instruction on the specified hart, advancing its state by one step.
++- **get_flen**: Obtain the floating-point register width (FLEN) for a hart.
++- **get_vlen / get_elen**: Retrieve the vector register length (VLEN) and element length (ELEN) for a hart.
++- **get_vector_reg**: Fetch the contents of a vector register for a given hart.
++- **get_memory_at_VA**: Read a specified number of bytes from virtual memory at a given address for a hart, returning the data as a vector of the requested type.
++- **set_memory_at_VA**: Write a vector of values to virtual memory at a specified address for a hart, storing the data as the given type.
++
++### Additional Python Interface
++
++  The Hammer Python module, exposed via `pybind11`, also provides:
++
++- **Enums for Platform and CSR Registers**:The module exposes the `PlatformDefines` and `CsrDefines` enums, allowing you to refer to platform constants and a comprehensive set of RISC-V Control and Status Register (CSR) identifiers directly from Python. For example:
++
++  ```python
++  from builddir import hammer as pyhammer
++  csr_val = pyhammer.CsrDefines.MSTATUS_CSR
++  ```
++- **Memory Configuration and Memory Objects**:The classes `mem_cfg_t` and `mem_t` are available in Python for configuring memory regions and representing memory, respectively.
++
++  ```python
++  mem_cfg = pyhammer.mem_cfg_t(base_addr, size)
++  memory = pyhammer.mem_t(size)
++  ```
++- **hello_world**:
++  A simple method for testing the Python binding, which returns a greeting string from the Hammer backend.
++
++  ```python
++  print(hammer.hello_world())
++  ```
++
++## Modifying Hammer for Our Use Case
++
++With recent updates in Spike, several internal functions have changed their interface. As a result, our wrapper code around Spike had to be updated to reflect these **API changes**. This ensures compatibility and proper exposure of required functionality to Hammer.
++
++The curent changes are done to Hammer with Spike commit `113ef64f6724b769ef9298e6a4a9802f7671021f` (https://github.com/riscv-software-src/riscv-isa-sim/commit/113ef64f6724b769ef9298e6a4a9802f7671021f) as of August 1, 2025.
++
++With the recent updates in Spike, Hammer has been modified to accommodate these changes.
++
++# Modifications:
++
++## 1. What’s Added in This Fork ?
++
++| Area                                | Change                                                                                                                                                       | Why it matters                                                                                                                                                                                                                                                                                               |
++| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
++| **Instruction introspection** | `get_insn*` helpers (word, hex, length,string) & `get_opcode`, `get_rs1_addr`, `get_rs2_addr`, `get_rs3_addr`, `get_rd_addr`, `get_csr_addr`  | To get more information about the instruction decoded                                                                                                                                                                                                                                                        |
++| **RVC support**               | `get_rvc_opcode`, `get_rvc_rs*`, `get_rvc_rd_addr`                                                                                                     | Same as above but for 16‑bit compressed instructions                                                                                                                                                                                                                                                        |
++| **Commit‑log access**        | `get_log_commits_enabled`, `get_log_reg_writes`, `get_log_mem_reads`, `get_log_mem_writes`                                                           | `<ul><li>`Enables spike to log the instructions `</li><li>`Access register logs to extract register write data and export to interface `</li><li>`Access memory read and write logs to extract memory accesses and export to interface `</li><li>`Enable debugging and trace analysis `</li></ul>` |
++| **CSR access**                | `get_csr` now returns `std::optional<reg_t>`                                                                                                             | `<ul><li>`Avoids crashes on unimplemented CSRs instead of throwing access errors `</li><li>`Flexibility from interface side to check if a CSR instruction was executed or not `</li><li>`Provides a consistent interface for accessing CSR values `</li></ul>`                                       |
++| **Helper**                    | private `get_insn_fetch()`                                                                                                                                 | Centralises MMU fetch so helpers stay small                                                                                                                                                                                                                                                                  |
++| **Default logging**           | Spike log path now defaults to**`ham.log`** (Can be customised and compiled)                                                                               | Easy side‑by‑side core vs. cosim inspection                                                                                                                                                                                                                                                              |
++| **Build system**              | *Meson* tweaks: `-D_GNU_SOURCE`, relaxed unused‑* warnings, removed hard‑wired test dirs                                                               | Builds cleanly with recent Clang/GCC and Spike headers                                                                                                                                                                                                                                                       |
++| **Examples**                  | `hammer_example.py`, `hammer_run.py`                                                                                                                     | End‑to‑end demo: load ELF, single‑step, print decoded fields                                                                                                                                                                                                                                              |
++
++Files touched:
++
++```
++README.md            (this file)
++hammer.h             hammer.cpp
++hammer_pybind.cpp    meson.build
++native-file.txt      hammer_example.py
++hammer_run.py        tests/test000.cpp
++ham.log              (new default log)
++```
++
++**NOTE:** Since the Spike's API has changed, the existing tests in `tests/*` and `pytests/*` may need to be updated to reflect these changes. But to test the updated API , you can run `hammer_example.py` or `hammer_run.py` to see the new features in action.
++
++---
++
++## 2 · Extended C++ API
++
++```cpp
++ // New public methods on class Hammer
++bool                         get_log_commits_enabled(uint8_t hart);
++insn_t                       get_insn(uint8_t hart, reg_t pc);
++int                          get_insn_length(uint8_t hart, reg_t pc);
++uint64_t                     get_insn_hex(uint8_t hart, reg_t pc);
++std::string 		     get_insn_string(uint8_t hart_id,reg_t pc);
++
++uint64_t                     get_opcode(uint8_t hart, reg_t pc);
++uint64_t                     get_rs1_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_rs2_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_rs3_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_rd_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_csr_addr(uint8_t hart, reg_t pc);
++
++uint64_t                     get_rvc_opcode(uint8_t hart, reg_t pc);
++uint64_t                     get_rvc_rs1_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_rvc_rs2_addr(uint8_t hart, reg_t pc);
++uint64_t                     get_rvc_rd_addr(uint8_t hart, reg_t pc);
++
++std::vector<std::pair<std::string,uint64_t>> get_log_reg_writes(uint8_t hart); // returns [register string name,data]
++commit_log_mem_t             get_log_mem_reads(uint8_t hart); // returns vector of [addr,data,size]
++commit_log_mem_t             get_log_mem_writes(uint8_t hart); //returns vector of [addr,data,size]
++std::optional<reg_t>         get_csr(uint8_t hart, uint32_t csr_id);
++```
++
++ **Observations:** When using `get_log_mem_reads()` , the returned `commit_log_mem_t` length is atleast 4 in all instruction executions. The address it read in my case was the address next to `<kernel_stack_end>`. The reason for this is not very clear, but it seems to be a quirk of the Spike simulator. But if the length is more than 4 , the first instructions that it reads will be the actual memory read instruction, so you can take all the vector pairs except the last four in the returned vector.
++
++```python
++        mem_reads=sim.get_log_mem_reads(0)
++        if mem_reads and len(mem_reads) > 4:
++            print("=== MEMORY READS ===")
++            for addr, value, size in mem_reads :
++                addr &= 0xFFFFFFFF  # Mask to 32 bits
++                print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
++                break
++```
++
++---
++
++## 3 · Python Bindings
++
++All new C++ methods are exported 1‑to‑1 via Pybind11.
++
++```python
++import hammer, pathlib
++
++elf = pathlib.Path("./ibex_load_instr_test_0.o")
++mem = hammer.mem_cfg_t(0x8000_0000, 256 * 1024 * 1024)
++
++sim = hammer.Hammer("RV32IMC", "msu", "", [0], [mem], str(elf), None)
++
++for _ in range(10):
++    pc  = sim.get_PC(0)
++    raw = sim.get_insn_hex(0, pc)
++    opc = sim.get_opcode(0, pc)
++    print(f"PC={pc:08x}  insn={raw:08x}  opcode={opc:03x}")
++    sim.single_step(0)
++```
++
++---
++
++## 4 · Building
++
++Edit ~/.bashrc and add
++
++```bash
++export SPIKE_HOME=$HOME/hammer-deps/spike-install      # or whatever you used
++```
++
++to set the Spike install directory globally.
++
++Then run the following commands in your terminal
++
++### 1. Build and install Spike (exact commit below)
++
++Skip this step if you edited `~/.bashrc` to set `SPIKE_HOME`.
++
++```bash
++export SPIKE_HOME=$HOME/hammer-deps/spike-install      # or whatever you used
++
++git clone https://github.com/riscv-software-src/riscv-isa-sim
++cd riscv-isa-sim && git checkout 113ef64f
++mkdir build && cd build && ../configure --prefix=$SPIKE_HOME 
++make -j$(nproc)
++make install
++```
++
++### 2. Build Hammer
++
++```bash
++python3 -m pip install pybind11
++meson setup builddir   --buildtype=release -Dspike_install_dir=$SPIKE_HOME
++meson compile -C builddir
++```
++
++> **Tip:** `LD_LIBRARY_PATH=$SPIKE_HOME/lib` must include the Spike libraries when you import `hammer` in Python.
++
++Add the following to your `~/.bashrc` to set the `LD_LIBRARY_PATH` and `builddir/` into PYTHONPATH globally:
++
++```bash
++export LD_LIBRARY_PATH=$SPIKE_HOME/lib:$LD_LIBRARY_PATH
++export PYTHONPATH=path-to-hammer/builddir:$PYTHONPATH
++```
++
++Then run:
++
++```bash
++source ~/.bashrc
++```
++
++**Note:** If using 2 or more virtual environments(to build Hammer and to import Hammer elsewhere), make sure they both run on same Python version and in the virtual environment where you want to import Hammer, run the following command:
++
++```bash
++# Create a virtual environment in the directory where you want to import Hammer
++python3 -m venv .venv
++
++# Add Hammer to PYTHONPATH automatically when activating
++echo 'export PYTHONPATH=path-to-hammer/hammer/builddir:$PYTHONPATH' > .venv/bin/activate.d/hammer.sh
++chmod +x .venv/bin/activate.d/hammer.sh
++
++source .venv/bin/activate
++```
++
++Now you can import `hammer` in Python and use it as described in the examples above.
++
++---
++
++## 5 · Running the Example
++
++```bash
++python3 hammer_example.py ./ibex_load_instr_test_0.o
++```
++
++Expect a short trace of `PC`, raw instruction, decoded opcode, plus an updated `ham.log` commit log.
++
++---
++
++## 6 · Known Limitations
++
++* Only tested on **RV32IMC**; RV64 helpers compile but lack CI.
++* Memory helpers show the last address/data pair seen by the MMU this cycle; concurrent load‑store contention on multi‑harts is **not** exposed yet.
++* CSR access returns `None` if Spike was compiled without that CSR – handle it.
++
++---
 diff --git a/README.md b/README.md
 index a47d0ec..52804d4 100644
 --- a/README.md
@@ -20,270 +361,304 @@ index a47d0ec..52804d4 100644
  
  ## Building Hammer and Running Tests
  
-diff --git a/ham.log b/ham.log
+diff --git a/fork_diff.patch b/fork_diff.patch
 new file mode 100644
-index 0000000..07a0e3d
+index 0000000..081d485
 --- /dev/null
-+++ b/ham.log
-@@ -0,0 +1,256 @@
-+core   0: 3 0x00001000 (0x00000297) x5  0x00001000
-+core   0: 3 0x00001004 (0x02028593) x11 0x00001020
-+core   0: 3 0x00001008 (0xf1402573) x10 0x00000000
-+core   0: 3 0x0000100c (0x0182a283) x5  0x80000080 mem 0x00001018
-+core   0: 3 0x00001010 (0x00028067)
-+core   0: 3 0x80000080 (0x40001137) x2  0x40001000
-+core   0: 3 0x80000084 (0x10410113) x2  0x40001104
-+core   0: 3 0x80000088 (0x30111073) c769_misa 0x40141104
-+core   0: 3 0x8000008c (0x00010517) x10 0x8001008c
-+core   0: 3 0x80000090 (0xbf850513) x10 0x8000fc84
-+core   0: 3 0x80000094 (0x00000117) x2  0x80000094
-+core   0: 3 0x80000098 (0xf6c10113) x2  0x80000000
-+core   0: 3 0x8000009c (0x00116113) x2  0x80000001
-+core   0: 3 0x800000a0 (0x30511073) c773_mtvec 0x80000001
-+core   0: 3 0x800000a4 (0x00000117) x2  0x800000a4
-+core   0: 3 0x800000a8 (0x00c10113) x2  0x800000b0
-+core   0: 3 0x800000ac (0x34111073) c833_mepc 0x800000b0
-+core   0: 3 0x800000b0 (0x80000037)
-+core   0: 3 0x800000b4 (0x0001)
-+core   0: 3 0x800000b6 (0xf54a30b7) x1  0xf54a3000
-+core   0: 3 0x800000ba (0xb8d08093) x1  0xf54a2b8d
-+core   0: 3 0x800000be (0x412d) x2  0x0000000b
-+core   0: 3 0x800000c0 (0x400aa1b7) x3  0x400aa000
-+core   0: 3 0x800000c4 (0xc7318193) x3  0x400a9c73
-+core   0: 3 0x800000c8 (0xe2857237) x4  0xe2857000
-+core   0: 3 0x800000cc (0x1d720213) x4  0xe28571d7
-+core   0: 3 0x800000d0 (0x977142b7) x5  0x97714000
-+core   0: 3 0x800000d4 (0xdfc28293) x5  0x97713dfc
-+core   0: 3 0x800000d8 (0x4301) x6  0x00000000
-+core   0: 3 0x800000da (0x032433b7) x7  0x03243000
-+core   0: 3 0x800000de (0x82538393) x7  0x03242825
-+core   0: 3 0x800000e2 (0x80000437) x8  0x80000000
-+core   0: 3 0x800000e6 (0x4495) x9  0x00000005
-+core   0: 3 0x800000e8 (0x459d) x11 0x00000007
-+core   0: 3 0x800000ea (0xf2fd2637) x12 0xf2fd2000
-+core   0: 3 0x800000ee (0xee760613) x12 0xf2fd1ee7
-+core   0: 3 0x800000f2 (0x4e2676b7) x13 0x4e267000
-+core   0: 3 0x800000f6 (0xeb568693) x13 0x4e266eb5
-+core   0: 3 0x800000fa (0xffd5e737) x14 0xffd5e000
-+core   0: 3 0x800000fe (0xe6770713) x14 0xffd5de67
-+core   0: 3 0x80000102 (0x4785) x15 0x00000001
-+core   0: 3 0x80000104 (0x4801) x16 0x00000000
-+core   0: 3 0x80000106 (0xc00018b7) x17 0xc0001000
-+core   0: 3 0x8000010a (0x78e88893) x17 0xc000178e
-+core   0: 3 0x8000010e (0x494899b7) x19 0x49489000
-+core   0: 3 0x80000112 (0x19b5) x19 0x49488fed
-+core   0: 3 0x80000114 (0x80000a37) x20 0x80000000
-+core   0: 3 0x80000118 (0x80000ab7) x21 0x80000000
-+core   0: 3 0x8000011c (0x4b25) x22 0x00000009
-+core   0: 3 0x8000011e (0x4b81) x23 0x00000000
-+core   0: 3 0x80000120 (0xfd1f5c37) x24 0xfd1f5000
-+core   0: 3 0x80000124 (0x3eac0c13) x24 0xfd1f53ea
-+core   0: 3 0x80000128 (0x4c91) x25 0x00000004
-+core   0: 3 0x8000012a (0x4d01) x26 0x00000000
-+core   0: 3 0x8000012c (0x4da9) x27 0x0000000a
-+core   0: 3 0x8000012e (0x80000e37) x28 0x80000000
-+core   0: 3 0x80000132 (0x4e81) x29 0x00000000
-+core   0: 3 0x80000134 (0x4f01) x30 0x00000000
-+core   0: 3 0x80000136 (0xd2e78fb7) x31 0xd2e78000
-+core   0: 3 0x8000013a (0x693f8f93) x31 0xd2e78693
-+core   0: 3 0x8000013e (0x0000b917) x18 0x8000b13e
-+core   0: 3 0x80000142 (0xd2690913) x18 0x8000ae64
-+core   0: 3 0x80000146 (0xa009)
-+core   0: 3 0x80000148 (0x03843033)
-+core   0: 3 0x8000014c (0x01342033)
-+core   0: 3 0x80000150 (0x00ac4033)
-+core   0: 3 0x80000154 (0x413db113) x2  0x00000001
-+core   0: 3 0x80000158 (0x009fd013)
-+core   0: 3 0x8000015c (0x03c22e33) x28 0xf142b8eb
-+core   0: 3 0x80000160 (0x41a608b3) x17 0xf2fd1ee7
-+core   0: 3 0x80000164 (0x001510b3) x1  0x1f908000
-+core   0: 3 0x80000168 (0xcee5)
-+core   0: 3 0x8000016a (0x03395233) x4  0x00000001
-+core   0: 3 0x8000016e (0x4131d033)
-+core   0: 3 0x80000172 (0x99b6) x19 0x976efea2
-+core   0: 3 0x80000174 (0x987d) x8  0x80000000
-+core   0: 3 0x80000176 (0x0e466063)
-+core   0: 3 0x8000017a (0x8c55) x8  0xce266eb5
-+core   0: 3 0x8000017c (0x00004417) x8  0x8000417c
-+core   0: 3 0x80000180 (0xd8f40413) x8  0x80003f0b
-+core   0: 3 0x80000184 (0xf8141b03) x22 0xffffd015 mem 0x80003e8c
-+core   0: 3 0x80000188 (0x09440223) mem 0x80003f8f 0x00
-+core   0: 3 0x8000018c (0x44f9) x9  0x0000001e
-+core   0: 3 0x8000018e (0xf3344f83) x31 0x0000008f mem 0x80003e3e
-+core   0: 3 0x80000192 (0x8ccd) x9  0x0000001f
-+core   0: 3 0x80000194 (0x6155) x2  0x00000131
-+core   0: 3 0x80000196 (0xf3040683) x13 0xffffffa8 mem 0x80003e3b
-+core   0: 3 0x8000019a (0x07942a83) x21 0x4f453da7 mem 0x80003f84
-+core   0: 3 0x8000019e (0x0a242a23) mem 0x80003fbf 0x00000131
-+core   0: 3 0x800001a2 (0x07941b03) x22 0x00003da7 mem 0x80003f84
-+core   0: 3 0x800001a6 (0xf2941ca3) mem 0x80003e44 0x001f
-+core   0: 3 0x800001aa (0x042422a3) mem 0x80003f50 0x00000131
-+core   0: 3 0x800001ae (0x022425a3) mem 0x80003f36 0x00000131
-+core   0: 3 0x800001b2 (0x95d2) x11 0x80000007
-+core   0: 3 0x800001b4 (0xfcc42a83) x21 0x84a5f604 mem 0x80003ed7
-+core   0: 3 0x800001b8 (0x616d) x2  0x00000221
-+core   0: 3 0x800001ba (0x024314b3) x9  0x00000000
-+core   0: 3 0x800001be (0x010829b3) x19 0x00000000
-+core   0: 3 0x800001c2 (0x41a65813) x16 0xfffffffc
-+core   0: 3 0x800001c6 (0x019b5db3) x27 0x000003da
-+core   0: 3 0x800001ca (0x01339113) x2  0x41280000
-+core   0: 3 0x800001ce (0x0e941023) mem 0x80003feb 0x0000
-+core   0: 3 0x800001d2 (0xfa244f83) x31 0x0000000b mem 0x80003ead
-+core   0: 3 0x800001d6 (0x6c39) x24 0x0000e000
-+core   0: 3 0x800001d8 (0xfe242e23) mem 0x80003f07 0x41280000
-+core   0: 3 0x800001dc (0xf9b41b03) x22 0x0000524e mem 0x80003ea6
-+core   0: 3 0x800001e0 (0x409d55b3) x11 0x00000000
-+core   0: 3 0x800001e4 (0x8691) x13 0xfffffffa
-+core   0: 3 0x800001e6 (0xf4242f23) mem 0x80003e69 0x41280000
-+core   0: 3 0x800001ea (0x07440aa3) mem 0x80003f80 0x00
-+core   0: 3 0x800001ee (0x0176d113) x2  0x000001ff
-+core   0: 3 0x800001f2 (0x0d544f83) x31 0x00000073 mem 0x80003fe0
-+core   0: 3 0x800001f6 (0x8ed1) x13 0xffffffff
-+core   0: 3 0x800001f8 (0xe01ae717) x14 0x601ae1f8
-+core   0: 3 0x800001fc (0x0e944f83) x31 0x000000d0 mem 0x80003ff4
-+core   0: 3 0x80000200 (0x0286af33) x30 0xffffffff
-+core   0: 3 0x80000204 (0x01b7b593) x11 0x00000001
-+core   0: 3 0x80000208 (0xf3245003) mem 0x80003e3d
-+core   0: 3 0x8000020c (0x01142a83) x21 0x434a6c7d mem 0x80003f1c
-+core   0: 3 0x80000210 (0x80c6) x1  0xf2fd1ee7
-+core   0: 3 0x80000212 (0x48f18013)
-+core   0: 3 0x80000216 (0xf4e40683) x13 0xfffffff3 mem 0x80003e59
-+core   0: 3 0x8000021a (0xfbc45003) mem 0x80003ec7
-+core   0: 3 0x8000021e (0x3e8b3193) x3  0x00000000
-+core   0: 3 0x80000222 (0x6149) x2  0x0000028f
-+core   0: 3 0x80000224 (0xff440f23) mem 0x80003f09 0x00
-+core   0: 3 0x80000228 (0xfe141b03) x22 0xffff8d13 mem 0x80003eec
-+core   0: 3 0x8000022c (0x0e242ca3) mem 0x80004004 0x0000028f
-+core   0: 3 0x80000230 (0x05440023) mem 0x80003f4b 0x00
-+core   0: 3 0x80000234 (0xfdc45003) mem 0x80003ee7
-+core   0: 3 0x80000238 (0xfd440ea3) mem 0x80003ee8 0x00
-+core   0: 3 0x8000023c (0x04942a83) x21 0xe1b99538 mem 0x80003f54
-+core   0: 3 0x80000240 (0x41735cb3) x25 0x00000000
-+core   0: 3 0x80000244 (0x88703c13) x24 0x00000001
-+core   0: 3 0x80000248 (0x01ac6b33) x22 0x00000001
-+core   0: 3 0x8000024c (0x00d80fb3) x31 0xffffffef
-+core   0: 3 0x80000250 (0x86fd) x13 0xffffffff
-+core   0: 3 0x80000252 (0xb9b3c613) x12 0xfcdbd3be
-+core   0: 3 0x80000256 (0x95aa) x11 0x8000fc85
-+core   0: 3 0x80000258 (0x0001)
-+core   0: 3 0x8000025a (0x02cc5433) x8  0x00000000
-+core   0: 3 0x8000025e (0x8df1) x11 0x8000d084
-+core   0: 3 0x80000260 (0x54d57d93) x27 0x00000404
-+core   0: 3 0x80000264 (0x6135) x2  0x000003ef
-+core   0: 3 0x80000266 (0x021d1fb3) x31 0x00000000
-+core   0: 3 0x8000026a (0x009b0863)
-+core   0: 3 0x8000026e (0x8d81ec37) x24 0x8d81e000
-+core   0: 3 0x80000272 (0x0dfa) x27 0x00000000
-+core   0: 3 0x80000274 (0x86b9) x13 0xffffffff
-+core   0: 3 0x80000276 (0x016e7233) x4  0x00000001
-+core   0: 3 0x8000027a (0x00457c63)
-+core   0: 3 0x80000292 (0x418b58b3) x17 0x00000001
-+core   0: 3 0x80000296 (0x4185) x3  0x00000001
-+core   0: 3 0x80000298 (0xc199)
-+core   0: 3 0x8000029a (0x40ec8033)
-+core   0: 3 0x8000029e (0x8ba5) x15 0x00000001
-+core   0: 3 0x800002a0 (0x01cb2333) x6  0x00000000
-+core   0: 3 0x800002a4 (0x01a3d213) x4  0x00000000
-+core   0: 3 0x800002a8 (0x007a9663)
-+core   0: 3 0x800002b4 (0x014a) x2  0x0fbc0000
-+core   0: 3 0x800002b6 (0x8cef7037)
-+core   0: 3 0x800002ba (0x00211fb3) x31 0x0fbc0000
-+core   0: 3 0x800002be (0x0001)
-+core   0: 3 0x800002c0 (0x0c26) x24 0x03c00000
-+core   0: 3 0x800002c2 (0x0399d463)
-+core   0: 3 0x800002ea (0x017e9213) x4  0x00000000
-+core   0: 3 0x800002ee (0x01f35d93) x27 0x00000000
-+core   0: 3 0x800002f2 (0x0001)
-+core   0: 3 0x800002f4 (0x8ac1) x13 0x00000010
-+core   0: 3 0x800002f6 (0x643d) x8  0x0000f000
-+core   0: 3 0x800002f8 (0x8dc9) x11 0x8000fc84
-+core   0: 3 0x800002fa (0x00cfed63)
-+core   0: 3 0x80000314 (0x00c80233) x4  0xfcdbd3ba
-+core   0: 3 0x80000318 (0x00000e97) x29 0x80000318
-+core   0: 3 0x8000031c (0x00ce8e93) x29 0x80000324
-+core   0: 3 0x80000320 (0x000e8067)
-+core   0: 3 0x80000324 (0x4185) x3  0x00000001
-+core   0: 3 0x80000000 (0x6fc0106f)
-+core   0: 3 0x800016fc (0x34091973) x18 0x00000000 c832_mscratch 0x8000ae64
-+core   0: 3 0x80001700 (0x00050933) x18 0x8000fc84
-+core   0: 3 0x80001704 (0xf8490913) x18 0x8000fc08
-+core   0: 3 0x80001708 (0x00192223) mem 0x8000fc0c 0xf2fd1ee7
-+core   0: 3 0x8000170c (0x00292423) mem 0x8000fc10 0x0fbc0000
-+core   0: 3 0x80001710 (0x00392623) mem 0x8000fc14 0x00000001
-+core   0: 3 0x80001714 (0x00492823) mem 0x8000fc18 0xfcdbd3ba
-+core   0: 3 0x80001718 (0x00592a23) mem 0x8000fc1c 0x97713dfc
-+core   0: 3 0x8000171c (0x00692c23) mem 0x8000fc20 0x00000000
-+core   0: 3 0x80001720 (0x00792e23) mem 0x8000fc24 0x03242825
-+core   0: 3 0x80001724 (0x02892023) mem 0x8000fc28 0x0000f000
-+core   0: 3 0x80001728 (0x02992223) mem 0x8000fc2c 0x00000000
-+core   0: 3 0x8000172c (0x02a92423) mem 0x8000fc30 0x8000fc84
-+core   0: 3 0x80001730 (0x02b92623) mem 0x8000fc34 0x8000fc84
-+core   0: 3 0x80001734 (0x02c92823) mem 0x8000fc38 0xfcdbd3be
-+core   0: 3 0x80001738 (0x02d92a23) mem 0x8000fc3c 0x00000010
-+core   0: 3 0x8000173c (0x02e92c23) mem 0x8000fc40 0x601ae1f8
-+core   0: 3 0x80001740 (0x02f92e23) mem 0x8000fc44 0x00000001
-+core   0: 3 0x80001744 (0x05092023) mem 0x8000fc48 0xfffffffc
-+core   0: 3 0x80001748 (0x05192223) mem 0x8000fc4c 0x00000001
-+core   0: 3 0x8000174c (0x05292423) mem 0x8000fc50 0x8000fc08
-+core   0: 3 0x80001750 (0x05392623) mem 0x8000fc54 0x00000000
-+core   0: 3 0x80001754 (0x05492823) mem 0x8000fc58 0x80000000
-+core   0: 3 0x80001758 (0x05592a23) mem 0x8000fc5c 0xe1b99538
-+core   0: 3 0x8000175c (0x05692c23) mem 0x8000fc60 0x00000001
-+core   0: 3 0x80001760 (0x05792e23) mem 0x8000fc64 0x00000000
-+core   0: 3 0x80001764 (0x07892023) mem 0x8000fc68 0x03c00000
-+core   0: 3 0x80001768 (0x07992223) mem 0x8000fc6c 0x00000000
-+core   0: 3 0x8000176c (0x07a92423) mem 0x8000fc70 0x00000000
-+core   0: 3 0x80001770 (0x07b92623) mem 0x8000fc74 0x00000000
-+core   0: 3 0x80001774 (0x07c92823) mem 0x8000fc78 0xf142b8eb
-+core   0: 3 0x80001778 (0x07d92a23) mem 0x8000fc7c 0x80000324
-+core   0: 3 0x8000177c (0x07e92c23) mem 0x8000fc80 0xffffffff
-+core   0: 3 0x80001780 (0x07f92e23) mem 0x8000fc84 0x0fbc0000
-+core   0: 3 0x80001784 (0x34102173) x2  0x80000326
-+core   0: 3 0x80001788 (0x34202173) x2  0x0000000b
-+core   0: 3 0x8000178c (0x4fad) x31 0x0000000b
-+core   0: 3 0x8000178e (0x01f10d63)
-+core   0: 3 0x800017a8 (0xfffff117) x2  0x800007a8
-+core   0: 3 0x800017ac (0x8d810113) x2  0x80000080
-+core   0: 3 0x800017b0 (0xc002) mem 0x80000080 0x00000000
-+core   0: 3 0x800017b2 (0xc206) mem 0x80000084 0xf2fd1ee7
-+core   0: 3 0x800017b4 (0xc40a) mem 0x80000088 0x80000080
-+core   0: 3 0x800017b6 (0xc60e) mem 0x8000008c 0x00000001
-+core   0: 3 0x800017b8 (0xc812) mem 0x80000090 0xfcdbd3ba
-+core   0: 3 0x800017ba (0xca16) mem 0x80000094 0x97713dfc
-+core   0: 3 0x800017bc (0xcc1a) mem 0x80000098 0x00000000
-+core   0: 3 0x800017be (0xce1e) mem 0x8000009c 0x03242825
-+core   0: 3 0x800017c0 (0xd022) mem 0x800000a0 0x0000f000
-+core   0: 3 0x800017c2 (0xd226) mem 0x800000a4 0x00000000
-+core   0: 3 0x800017c4 (0xd42a) mem 0x800000a8 0x8000fc84
-+core   0: 3 0x800017c6 (0xd62e) mem 0x800000ac 0x8000fc84
-+core   0: 3 0x800017c8 (0xd832) mem 0x800000b0 0xfcdbd3be
-+core   0: 3 0x800017ca (0xda36) mem 0x800000b4 0x00000010
-+core   0: 3 0x800017cc (0xdc3a) mem 0x800000b8 0x601ae1f8
-+core   0: 3 0x800017ce (0xde3e) mem 0x800000bc 0x00000001
-+core   0: 3 0x800017d0 (0xc0c2) mem 0x800000c0 0xfffffffc
-+core   0: 3 0x800017d2 (0xc2c6) mem 0x800000c4 0x00000001
-+core   0: 3 0x800017d4 (0xc4ca) mem 0x800000c8 0x8000fc08
-+core   0: 3 0x800017d6 (0xc6ce) mem 0x800000cc 0x00000000
-+core   0: 3 0x800017d8 (0xc8d2) mem 0x800000d0 0x80000000
-+core   0: 3 0x800017da (0xcad6) mem 0x800000d4 0xe1b99538
-+core   0: 3 0x800017dc (0xccda) mem 0x800000d8 0x00000001
-+core   0: 3 0x800017de (0xcede) mem 0x800000dc 0x00000000
-+core   0: 3 0x800017e0 (0xd0e2) mem 0x800000e0 0x03c00000
-+core   0: 3 0x800017e2 (0xd2e6) mem 0x800000e4 0x00000000
-+core   0: 3 0x800017e4 (0xd4ea) mem 0x800000e8 0x00000000
-+core   0: 3 0x800017e6 (0xd6ee) mem 0x800000ec 0x00000000
-+core   0: 3 0x800017e8 (0xd8f2) mem 0x800000f0 0xf142b8eb
-+core   0: 3 0x800017ea (0xdaf6) mem 0x800000f4 0x80000324
-+core   0: 3 0x800017ec (0xdcfa) mem 0x800000f8 0xffffffff
-+core   0: 3 0x800017ee (0xdefe) mem 0x800000fc 0x0000000b
-+core   0: 3 0x800017f0 (0x34102173) x2  0x80000326
-+core   0: 3 0x800017f4 (0x0111) x2  0x8000032a
-+core   0: 3 0x800017f6 (0x34111073) c833_mepc 0x8000032a
-+core   0: 3 0x800017fa (0x30200073) c768_mstatus 0x00000080 c784_mstatush 0x00000000
-+core   0: 3 0x8000032a (0x00002f17) x30 0x8000232a
-+core   0: 3 0x8000032e (0xcc3f2b23) mem 0x80002000 0x00000001
++++ b/fork_diff.patch
+@@ -0,0 +1,289 @@
++diff --git a/.gitignore b/.gitignore
++index dd96872..6152bc0 100644
++--- a/.gitignore
+++++ b/.gitignore
++@@ -3,3 +3,5 @@
++ # SPDX-License-Identifier: Apache-2.0
++ 
++ .vscode
+++
+++ham.log
++\ No newline at end of file
++diff --git a/HAMMER.md b/HAMMER.md
++new file mode 100644
++index 0000000..3fcb789
++--- /dev/null
+++++ b/HAMMER.md
++@@ -0,0 +1,324 @@
+++# Documentation on Hammer & Modifying it for Our Use Case
+++
+++**Date:** July 31, 2025
+++
+++**Latest Hammer Commit:** 6d9fac96407149a1a533cdd3f63f6bbd96614ffa
+++
+++Hammer is an infrastructure to drive Spike (the RISC-V ISA Simulator) in co-simulation mode, designed by Rivos. It provides both C++ and Python interfaces to interact with Spike, enabling detailed instruction-level simulation, tracing, and analysis for RISC-V software and hardware development. Hammer is especially useful for co-simulation, debugging, and automated test environments.
+++
+++The source code is available here: [https://github.com/rivosinc/hammer](https://github.com/rivosinc/hammer)
+++
+++Hammer leverages `pybind` to provide a Python interface, using Spike’s executables and shared libraries to enable seamless integration between Python and C++. This allows users to script, automate, and analyze RISC-V simulation runs directly from Python, while still having access to the full power of Spike's C++ backend.
+++
+++`meson` is the build infrastructure used to build the Hammer source code and execute it. This ensures a modern, fast, and reproducible build process.
+++
+++The main sections in this repo are:
+++
+++- `hammer.h`  — Contains the Hammer class definition and API
+++- `hammer.cpp` — Implementation of the Hammer class and core logic
+++- `hammer_enums.h` — Enumerations for register types, privilege levels, etc.
+++- `hammer_pybind.cpp` — Python bindings using pybind11
+++
+++---
+++
+++### Features
+++
+++- Single-step and batch instruction execution
+++- Python and C++ APIs for scripting and automation
+++- Support for custom extensions and modifications
+++
+++---
+++
+++### Build & Installation
+++
+++Hammer uses `meson` as its build infrastructure.
+++The build steps can be found at the Hammer repository.
+++Refer to it [here](https://github.com/rivosinc/hammer/blob/main/README.md)
+++
+++### Command to Run Tests
+++
+++To run the tests:
+++
+++```sh
+++meson test -C builddir
+++```
+++
+++This command compiles the test input files into ELF binaries using a RISC-V toolchain and executes them through the Meson test framework.
+++
+++## Common Build Errors
+++
+++## NOTE
+++
+++The command `meson test -C builddir` has **not been successfully tested** in this environment.
+++
+++> **This is because it requires:**
+++>
+++> - A RISC-V GCC toolchain that supports the `rv64gcv` ISA (including vector instructions).
+++> - Properly formatted linker scripts that avoid using unsupported syntax (e.g., `#` for comments).
+++>
+++> Without these prerequisites, test compilation and execution will fail due to assembler or linker errors.
+++
+++---
+++
+++## Usage
+++
+++The current functionalities exposed through the interface include:
+++
+++- Instantiating a Hammer object in `Python` which initializes the Spike simulator and preloads the ELF File.
+++
+++  ```python
+++  import builddir.hammer as pyhammer
+++  hammer = pyhammer.Hammer("RV64GCV", "MSU", "vlen:512,elen:64", hart_ids, [mem_layout], elf_name, None)
+++  ```
+++
+++  - Another example in `Python`:
+++
+++  ```python
+++  import builddir.hammer as pyhammer
+++  mem_cfg = pyhammer.mem_cfg_t(pyhammer.DramBase, 256 * 1024 * 1024)
+++  hammer = pyhammer.Hammer("RV32IMC", "msu", "", hart_ids, [mem_cfg], target_binary, None)
+++  ```
+++- Instantiating a Hammer object in `C++` which initializes the Spike simulator and preloads the ELF File.
+++
+++  ```cpp
+++  Hammer(const char *isa, const char *privilege_levels, const char *vector_arch,
+++         std::vector<size_t> hart_ids, std::vector<mem_cfg_t> memory_layout,
+++         const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt)
+++  ```
+++
+++  - Example snippet in `C++`:
+++
+++  ```cpp
+++  std::vector<mem_cfg_t> memory_layout;
+++  // This is what Spike sets it to
+++  memory_layout.push_back(mem_cfg_t(reg_t(DRAM_BASE), reg_t(2048) << 20));
+++
+++  std::vector<size_t> hart_ids{0};
+++  Hammer hammer = Hammer("RV64GCV", "MSU", "vlen:512,elen:32", hart_ids, memory_layout,
+++                         target_binary, std::nullopt);
+++  ```
+++
+++Some more example snippets in `C++` can be found in `hammer/tests` and `hammer/pytests` for `Python`.
+++
+++### Exposed Functionalities
+++
+++- **get_gpr / set_gpr**: Read or write the value of a general-purpose register (GPR) for a specific hardware thread (hart).
+++- **get_fpr**: Retrieve the value of a floating-point register (FPR) for a given hart.
+++- **get_PC / set_PC**: Get or set the program counter (PC) for a specified hart.
+++  **NOTE:** The `get_PC` returns pc address which points to the next instruction to be executed, not the current instruction that has been executed.
+++- **get_csr**: Access the value of a control and status register (CSR) for a particular hart.
+++- **single_step**: Execute a single instruction on the specified hart, advancing its state by one step.
+++- **get_flen**: Obtain the floating-point register width (FLEN) for a hart.
+++- **get_vlen / get_elen**: Retrieve the vector register length (VLEN) and element length (ELEN) for a hart.
+++- **get_vector_reg**: Fetch the contents of a vector register for a given hart.
+++- **get_memory_at_VA**: Read a specified number of bytes from virtual memory at a given address for a hart, returning the data as a vector of the requested type.
+++- **set_memory_at_VA**: Write a vector of values to virtual memory at a specified address for a hart, storing the data as the given type.
+++
+++### Additional Python Interface
+++
+++  The Hammer Python module, exposed via `pybind11`, also provides:
+++
+++- **Enums for Platform and CSR Registers**:The module exposes the `PlatformDefines` and `CsrDefines` enums, allowing you to refer to platform constants and a comprehensive set of RISC-V Control and Status Register (CSR) identifiers directly from Python. For example:
+++
+++  ```python
+++  from builddir import hammer as pyhammer
+++  csr_val = pyhammer.CsrDefines.MSTATUS_CSR
+++  ```
+++- **Memory Configuration and Memory Objects**:The classes `mem_cfg_t` and `mem_t` are available in Python for configuring memory regions and representing memory, respectively.
+++
+++  ```python
+++  mem_cfg = pyhammer.mem_cfg_t(base_addr, size)
+++  memory = pyhammer.mem_t(size)
+++  ```
+++- **hello_world**:
+++  A simple method for testing the Python binding, which returns a greeting string from the Hammer backend.
+++
+++  ```python
+++  print(hammer.hello_world())
+++  ```
+++
+++## Modifying Hammer for Our Use Case
+++
+++With recent updates in Spike, several internal functions have changed their interface. As a result, our wrapper code around Spike had to be updated to reflect these **API changes**. This ensures compatibility and proper exposure of required functionality to Hammer.
+++
+++The curent changes are done to Hammer with Spike commit `113ef64f6724b769ef9298e6a4a9802f7671021f` (https://github.com/riscv-software-src/riscv-isa-sim/commit/113ef64f6724b769ef9298e6a4a9802f7671021f) as of August 1, 2025.
+++
+++With the recent updates in Spike, Hammer has been modified to accommodate these changes.
+++
+++# Modifications:
+++
+++## 1. What’s Added in This Fork ?
+++
+++| Area                                | Change                                                                                                                                                       | Why it matters                                                                                                                                                                                                                                                                                               |
+++| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+++| **Instruction introspection** | `get_insn*` helpers (word, hex, length,string) & `get_opcode`, `get_rs1_addr`, `get_rs2_addr`, `get_rs3_addr`, `get_rd_addr`, `get_csr_addr`  | To get more information about the instruction decoded                                                                                                                                                                                                                                                        |
+++| **RVC support**               | `get_rvc_opcode`, `get_rvc_rs*`, `get_rvc_rd_addr`                                                                                                     | Same as above but for 16‑bit compressed instructions                                                                                                                                                                                                                                                        |
+++| **Commit‑log access**        | `get_log_commits_enabled`, `get_log_reg_writes`, `get_log_mem_reads`, `get_log_mem_writes`                                                           | `<ul><li>`Enables spike to log the instructions `</li><li>`Access register logs to extract register write data and export to interface `</li><li>`Access memory read and write logs to extract memory accesses and export to interface `</li><li>`Enable debugging and trace analysis `</li></ul>` |
+++| **CSR access**                | `get_csr` now returns `std::optional<reg_t>`                                                                                                             | `<ul><li>`Avoids crashes on unimplemented CSRs instead of throwing access errors `</li><li>`Flexibility from interface side to check if a CSR instruction was executed or not `</li><li>`Provides a consistent interface for accessing CSR values `</li></ul>`                                       |
+++| **Helper**                    | private `get_insn_fetch()`                                                                                                                                 | Centralises MMU fetch so helpers stay small                                                                                                                                                                                                                                                                  |
+++| **Default logging**           | Spike log path now defaults to**`ham.log`** (Can be customised and compiled)                                                                               | Easy side‑by‑side core vs. cosim inspection                                                                                                                                                                                                                                                              |
+++| **Build system**              | *Meson* tweaks: `-D_GNU_SOURCE`, relaxed unused‑* warnings, removed hard‑wired test dirs                                                               | Builds cleanly with recent Clang/GCC and Spike headers                                                                                                                                                                                                                                                       |
+++| **Examples**                  | `hammer_example.py`, `hammer_run.py`                                                                                                                     | End‑to‑end demo: load ELF, single‑step, print decoded fields                                                                                                                                                                                                                                              |
+++
+++Files touched:
+++
+++```
+++README.md            (this file)
+++hammer.h             hammer.cpp
+++hammer_pybind.cpp    meson.build
+++native-file.txt      hammer_example.py
+++hammer_run.py        tests/test000.cpp
+++ham.log              (new default log)
+++```
+++
+++**NOTE:** Since the Spike's API has changed, the existing tests in `tests/*` and `pytests/*` may need to be updated to reflect these changes. But to test the updated API , you can run `hammer_example.py` or `hammer_run.py` to see the new features in action.
+++
+++---
+++
+++## 2 · Extended C++ API
+++
+++```cpp
+++ // New public methods on class Hammer
+++bool                         get_log_commits_enabled(uint8_t hart);
+++insn_t                       get_insn(uint8_t hart, reg_t pc);
+++int                          get_insn_length(uint8_t hart, reg_t pc);
+++uint64_t                     get_insn_hex(uint8_t hart, reg_t pc);
+++std::string 		     get_insn_string(uint8_t hart_id,reg_t pc);
+++
+++uint64_t                     get_opcode(uint8_t hart, reg_t pc);
+++uint64_t                     get_rs1_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_rs2_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_rs3_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_rd_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_csr_addr(uint8_t hart, reg_t pc);
+++
+++uint64_t                     get_rvc_opcode(uint8_t hart, reg_t pc);
+++uint64_t                     get_rvc_rs1_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_rvc_rs2_addr(uint8_t hart, reg_t pc);
+++uint64_t                     get_rvc_rd_addr(uint8_t hart, reg_t pc);
+++
+++std::vector<std::pair<std::string,uint64_t>> get_log_reg_writes(uint8_t hart); // returns [register string name,data]
+++commit_log_mem_t             get_log_mem_reads(uint8_t hart); // returns vector of [addr,data,size]
+++commit_log_mem_t             get_log_mem_writes(uint8_t hart); //returns vector of [addr,data,size]
+++std::optional<reg_t>         get_csr(uint8_t hart, uint32_t csr_id);
+++```
+++
+++ **Observations:** When using `get_log_mem_reads()` , the returned `commit_log_mem_t` length is atleast 4 in all instruction executions. The address it read in my case was the address next to `<kernel_stack_end>`. The reason for this is not very clear, but it seems to be a quirk of the Spike simulator. But if the length is more than 4 , the first instructions that it reads will be the actual memory read instruction, so you can take all the vector pairs except the last four in the returned vector.
+++
+++```python
+++        mem_reads=sim.get_log_mem_reads(0)
+++        if mem_reads and len(mem_reads) > 4:
+++            print("=== MEMORY READS ===")
+++            for addr, value, size in mem_reads :
+++                addr &= 0xFFFFFFFF  # Mask to 32 bits
+++                print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
+++                break
+++```
+++
+++---
+++
+++## 3 · Python Bindings
+++
+++All new C++ methods are exported 1‑to‑1 via Pybind11.
+++
+++```python
+++import hammer, pathlib
+++
+++elf = pathlib.Path("./ibex_load_instr_test_0.o")
+++mem = hammer.mem_cfg_t(0x8000_0000, 256 * 1024 * 1024)
+++
+++sim = hammer.Hammer("RV32IMC", "msu", "", [0], [mem], str(elf), None)
+++
+++for _ in range(10):
+++    pc  = sim.get_PC(0)
+++    raw = sim.get_insn_hex(0, pc)
+++    opc = sim.get_opcode(0, pc)
+++    print(f"PC={pc:08x}  insn={raw:08x}  opcode={opc:03x}")
+++    sim.single_step(0)
+++```
+++
+++---
+++
+++## 4 · Building
+++
+++Edit ~/.bashrc and add
+++
+++```bash
+++export SPIKE_HOME=$HOME/hammer-deps/spike-install      # or whatever you used
+++```
+++
+++to set the Spike install directory globally.
+++
+++Then run the following commands in your terminal
+++
+++### 1. Build and install Spike (exact commit below)
+++
+++Skip this step if you edited `~/.bashrc` to set `SPIKE_HOME`.
+++
+++```bash
+++export SPIKE_HOME=$HOME/hammer-deps/spike-install      # or whatever you used
+++
+++git clone https://github.com/riscv-software-src/riscv-isa-sim
+++cd riscv-isa-sim && git checkout 113ef64f
+++mkdir build && cd build && ../configure --prefix=$SPIKE_HOME 
+++make -j$(nproc)
+++make install
+++```
+++
+++### 2. Build Hammer
+++
+++```bash
+++python3 -m pip install pybind11
+++meson setup builddir   --bui
+\ No newline at end of file
 diff --git a/hammer.cpp b/hammer.cpp
-index db48905..ff528c2 100644
+index db48905..7af6ede 100644
 --- a/hammer.cpp
 +++ b/hammer.cpp
 @@ -10,10 +10,11 @@
@@ -314,7 +689,7 @@ index db48905..ff528c2 100644
                                       .support_haltgroups = true,
                                       .support_impebreak = true};
 -  const char *log_path = nullptr;
-+  const char *log_path = "ham.log";
++  const char *log_path = "../ham.log";
    const char *dtb_file = nullptr;
    FILE *cmd_file = nullptr;
  
@@ -331,19 +706,19 @@ index db48905..ff528c2 100644
 +  // reg_t trigger_count = 4;
 +
 +  // reg_t num_pmpregions = 16;
- 
--  reg_t trigger_count = 4;
++
 +  // reg_t pmpgranularity   = (1 << PMP_SHIFT);
- 
--  reg_t num_pmpregions = 16;
++
 +  // reg_t cache_blocksz = 64;
  
--  endianness_t endinaness = endianness_little;
+-  reg_t trigger_count = 4;
 +  // endianness_t endinaness = endianness_little;
-+
+ 
+-  reg_t num_pmpregions = 16;
 +  // cfg_t cfg = cfg_t(initrd_bounds, bootargs, isa, privilege_levels, vector_arch, misaligned, endinaness, num_pmpregions, memory_layout,
 +  //                   hart_ids, real_time_clint, trigger_count);
-+
+ 
+-  endianness_t endinaness = endianness_little;
 +  cfg_t cfg; // Spike Commit 6023896 revised the cfg_t class
 +  // cfg.initrd_bounds    = initrd_bounds;
 +  // cfg.bootargs         = bootargs;
@@ -372,7 +747,7 @@ index db48905..ff528c2 100644
  
    std::vector<std::string> htif_args;
    htif_args.push_back(target_binary);
-@@ -64,16 +89,238 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
+@@ -64,16 +89,214 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
    bool halted = false;
    bool dtb_enabled = true;
    bool socket_enabled = false;
@@ -405,6 +780,16 @@ index db48905..ff528c2 100644
 +  mmu_t *mmu = hart->get_mmu();
 +  insn_fetch_t fetch = mmu->load_insn(pc);
 +  return fetch;
++}
++
++std::string Hammer::get_insn_string(uint8_t hart_id,reg_t pc) {
++  processor_t *hart = simulator->get_core(hart_id);
++  mmu_t *mmu = hart->get_mmu();
++  insn_fetch_t fetch = mmu->load_insn(pc);
++  insn_t insn = fetch.insn;
++  const disassembler_t *disasm = hart->get_disassembler();
++  std::string insn_str = disasm->disassemble(insn);
++  return insn_str;
 +}
 +
 +insn_t Hammer::get_insn(uint8_t hart_id,reg_t pc){
@@ -450,21 +835,6 @@ index db48905..ff528c2 100644
 +
 +uint64_t Hammer::get_rvc_rd_addr(uint8_t hart_id,reg_t pc){
 +  return get_insn_fetch(hart_id,pc).insn.rvc_rd();
-+}
-+
-+std::optional<reg_t> Hammer::get_memory_address(uint8_t hart_id) {
-+  //If a load or store happened (not li or any immediate) , we can check the 
-+  processor_t *hart = simulator->get_core(hart_id);
-+  commit_log_reg_t reg_write =hart->get_state()->log_reg_write;
-+  commit_log_mem_t mem_read = hart->get_state()->log_mem_read;
-+  commit_log_mem_t mem_write = hart->get_state()->log_mem_write;
-+  if (!mem_read.empty()) {
-+    return std::get<0>(mem_read[0]); // addr from tuple<addr, value, size>
-+  }
-+  if (!mem_write.empty()) {
-+    return std::get<0>(mem_write[0]);
-+  }
-+  return std::nullopt;
 +}
 +
 +std::vector<std::pair<std::string, uint64_t>> Hammer::get_log_reg_writes(uint8_t hart_id){
@@ -513,7 +883,7 @@ index db48905..ff528c2 100644
 +    }
 +    // NOT RELEVANT FOR RV32IMC
 +    if (!show_vec && (is_vreg || is_vec)) {
-+        // some fprintf
++        // log write 
 +        show_vec = true;
 +    }
 +
@@ -547,14 +917,14 @@ index db48905..ff528c2 100644
 +    processor_t *hart = simulator->get_core(hart_id);
 +    commit_log_mem_t load = hart->get_state()->log_mem_read;
 +    
-+    if (!load.empty()) {
-+        // std::cout << "=== MEMORY READS for PC: 0x" << std::hex << get_PC(hart_id) << std::dec << " ===" << std::endl;
-+    }
++    // if (!load.empty()) {
++    //     std::cout << "=== MEMORY READS for PC: 0x" << std::hex << get_PC(hart_id) << std::dec << " ===" << std::endl;
++    // }
 +    
 +    //address,data,size
 +    for (auto item : load) {
 +      // item is a tuple: <address, value, size>
-+      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
++      reg_t addr = std::get<0>(item);
 +      uint64_t value = std::get<1>(item);
 +      uint8_t size = std::get<2>(item);
 +      
@@ -578,7 +948,7 @@ index db48905..ff528c2 100644
 +    //address,data,size
 +    for (auto item : store) {
 +      // item is a tuple: <address, value, size>
-+      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
++      reg_t addr = std::get<0>(item);
 +      uint64_t value = std::get<1>(item);
 +      uint8_t size = std::get<2>(item);
 +      
@@ -589,40 +959,12 @@ index db48905..ff528c2 100644
 +    return result;
 +}
 +
-+std::optional<uint64_t> Hammer::get_memory_read_data(uint8_t hart_id) {
-+  processor_t *hart = simulator->get_core(hart_id);
-+  auto& mem_read = hart->get_state()->log_mem_read;
-+  if (!mem_read.empty()) {
-+    return std::get<1>(mem_read[0]); // value from tuple
-+  }
-+  return std::nullopt;
-+}
-+//tuple has <addr,val,hexe>
-+std::optional<uint64_t> Hammer::get_memory_write_data(uint8_t hart_id) {
-+  processor_t *hart = simulator->get_core(hart_id);
-+  auto& mem_write = hart->get_state()->log_mem_write;
-+  if (!mem_write.empty()) {
-+    return std::get<1>(mem_write[0]); // value from tuple
-+  }
-+  return std::nullopt;
-+}
-+
-+
 +
 +
  reg_t Hammer::get_gpr(uint8_t hart_id, uint8_t gpr_id) {
    assert(gpr_id < NXPR);
  
-@@ -106,7 +353,7 @@ reg_t Hammer::get_PC(uint8_t hart_id) {
-   processor_t *hart = simulator->get_core(hart_id);
-   state_t *hart_state = hart->get_state();
- 
--  return hart_state->pc;
-+  return hart_state->pc  & 0xFFFFFFFF;
- }
- 
- void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {
-@@ -116,9 +363,14 @@ void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {
+@@ -116,9 +339,14 @@ void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {
    hart_state->pc = new_pc_value;
  }
  
@@ -640,10 +982,10 @@ index db48905..ff528c2 100644
  
  void Hammer::single_step(uint8_t hart_id) {
 diff --git a/hammer.h b/hammer.h
-index 654a267..2f23cfc 100644
+index 654a267..0525c19 100644
 --- a/hammer.h
 +++ b/hammer.h
-@@ -3,8 +3,11 @@
+@@ -3,10 +3,15 @@
  // SPDX-License-Identifier: Apache-2.0
  
  #pragma once
@@ -655,13 +997,18 @@ index 654a267..2f23cfc 100644
 +#include "riscv/devices.h"        // device_factory_t
  #include "riscv/mmu.h"
  #include "riscv/sim.h"
++#include "riscv/disasm.h"
++
  
-@@ -17,6 +20,36 @@ class Hammer {
+ #include <iostream>
+ 
+@@ -17,6 +22,32 @@ class Hammer {
           const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
    ~Hammer();
  
 +  bool get_log_commits_enabled(uint8_t hart_id);
-+
++  
++  std::string get_insn_string(uint8_t hart_id,reg_t pc);
 +  insn_t get_insn(uint8_t hart_id,reg_t pc);
 +  int get_insn_length(uint8_t hart_id,reg_t pc);
 +  insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
@@ -678,11 +1025,6 @@ index 654a267..2f23cfc 100644
 +  u_int64_t get_rvc_rs2_addr(uint8_t hart_id,reg_t pc);
 +  u_int64_t get_rvc_rd_addr(uint8_t hart_id,reg_t pc);
 +  
-+  std::optional<reg_t> get_memory_address(uint8_t hart_id);
-+  std::optional<uint64_t> get_memory_read_data(uint8_t hart_id);
-+  std::optional<uint64_t> get_memory_write_data(uint8_t hart_id);
-+  // void dump(uint8_t hart_id);
-+  
 +  // Detailed register write logging (like Spike's commit log)
 +  std::vector<std::pair<std::string, uint64_t>> get_log_reg_writes(uint8_t hart_id);
 +  commit_log_mem_t get_log_mem_reads(uint8_t hart_id);
@@ -693,7 +1035,7 @@ index 654a267..2f23cfc 100644
    reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
    void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
  
-@@ -25,7 +58,7 @@ class Hammer {
+@@ -25,7 +56,7 @@ class Hammer {
    reg_t get_PC(uint8_t hart_id);
    void set_PC(uint8_t hart_id, reg_t new_pc_value);
  
@@ -702,7 +1044,7 @@ index 654a267..2f23cfc 100644
  
    void single_step(uint8_t hart_id);
  
-@@ -71,4 +104,5 @@ class Hammer {
+@@ -71,4 +102,5 @@ class Hammer {
  
   private:
    sim_t *simulator;
@@ -710,10 +1052,10 @@ index 654a267..2f23cfc 100644
  };
 diff --git a/hammer_example.py b/hammer_example.py
 new file mode 100644
-index 0000000..7bbdcc8
+index 0000000..1e0d89c
 --- /dev/null
 +++ b/hammer_example.py
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,101 @@
 +#!/usr/bin/env python3
 +"""
 +Quick sanity script for the Hammer ⇆ Spike wrapper.
@@ -737,7 +1079,7 @@ index 0000000..7bbdcc8
 +    elf = sys.argv[1]
 +    print(f"Loading ELF: {elf}")
 +
-+    mem_cfg = hammer.mem_cfg_t(0x80000000, 256 * 1024 * 1024)
++    mem_cfg = hammer.mem_cfg_t(hammer.DramBase, 256 * 1024 * 1024)
 +
 +    sim = hammer.Hammer(
 +        "RV32IMC",          # arg0: isa
@@ -755,8 +1097,10 @@ index 0000000..7bbdcc8
 +    for i in range(300):
 +        hart=0
 +
-+        pc  = sim.get_PC(0)
++        pc  = sim.get_PC(0) & 0xFFFFFFFF  # RV32IMC, so we mask to 32 bits
 +        insn_hex = sim.get_insn_hex(0, pc)
++        insn_str = sim.get_insn_string(0, pc)
++        # print(dir(insn_str))
 +        rs1 = sim.get_rs1_addr(0, pc)
 +        rs2 = sim.get_rs2_addr(0, pc)
 +        rs3 = sim.get_rs3_addr(0, pc)
@@ -780,6 +1124,7 @@ index 0000000..7bbdcc8
 +                val |= (byte_value << (val_a.index(byte_value) * 8))
 +        
 +        print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x}")
++        print(f"  insn_str: {insn_str}")
 +        reg_writes=sim.get_log_reg_writes(0)  # Dump the state of hart 0
 +        if reg_writes:
 +            print("=== REGISTER WRITES ===")
@@ -790,12 +1135,14 @@ index 0000000..7bbdcc8
 +        if mem_reads and len(mem_reads) > 4:
 +            print("=== MEMORY READS ===")
 +            for addr, value, size in mem_reads :
++                addr &= 0xFFFFFFFF  # Mask to 32 bits
 +                print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
 +                break
 +        mem_writes=sim.get_log_mem_writes(0)
 +        if mem_writes:
 +            print("=== MEMORY WRITES ===")
 +            for addr, value, size in mem_writes:
++                addr &= 0xFFFFFFFF  # Mask to 32 bits
 +                print(f"WRITE ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
 +        memory_contents = sim.get_memory_at_VA(0, 0x80002000, 4, 1)
 +        value_at_address = 0
@@ -811,16 +1158,17 @@ index 0000000..7bbdcc8
 +if __name__ == "__main__":
 +    main()
 diff --git a/hammer_pybind.cpp b/hammer_pybind.cpp
-index 495cb9d..95fc107 100644
+index 495cb9d..1b36af7 100644
 --- a/hammer_pybind.cpp
 +++ b/hammer_pybind.cpp
-@@ -19,6 +19,32 @@ PYBIND11_MODULE(hammer, m) {
+@@ -19,6 +19,30 @@ PYBIND11_MODULE(hammer, m) {
                            std::vector<mem_cfg_t>, const std::string,
                            const std::optional<uint64_t>>())
        .def("hello_world", &Hammer::hello_world)
 +      .def("get_log_commits_enabled",&Hammer::get_log_commits_enabled)
-+
++      
 +      .def("get_insn_hex",&Hammer::get_insn_hex)
++      .def("get_insn_string",&Hammer::get_insn_string)
 +      .def("get_insn",&Hammer::get_insn)
 +      .def("get_insn_length",&Hammer::get_insn_length)
 +      .def("get_opcode",&Hammer::get_opcode)
@@ -835,10 +1183,7 @@ index 495cb9d..95fc107 100644
 +      .def("get_rvc_rs1_addr",&Hammer::get_rvc_rs1_addr)
 +      .def("get_rvc_rs2_addr",&Hammer::get_rvc_rs2_addr)
 +      .def("get_rvc_rd_addr",&Hammer::get_rvc_rd_addr)
-+
-+      .def("get_memory_address",&Hammer::get_memory_address)
-+      .def("get_memory_read_data",&Hammer::get_memory_read_data)
-+      .def("get_memory_write_data",&Hammer::get_memory_write_data)
++        
 +      .def("get_log_reg_writes",&Hammer::get_log_reg_writes)
 +      .def("get_log_mem_reads",&Hammer::get_log_mem_reads)
 +      .def("get_log_mem_writes",&Hammer::get_log_mem_writes)
@@ -849,15 +1194,15 @@ index 495cb9d..95fc107 100644
        .def("get_fpr", &Hammer::get_fpr)
 diff --git a/hammer_run.py b/hammer_run.py
 new file mode 100644
-index 0000000..d71d46a
+index 0000000..b44b71c
 --- /dev/null
 +++ b/hammer_run.py
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,21 @@
 +import hammer, pathlib, sys
 +
 +# print(dir(hammer))
 +# elf = sys.argv[1]
-+elf = "/home/nitin/cocotb_simulation/top_tracing_simulation/ibex_arithmetic_basic_test_0.o"
++elf = "./ibex_load_instr_test_0.o"
 +
 +# Build one mem_cfg_t object – (base, size) just like the C++ struct
 +mem_cfg = hammer.mem_cfg_t(0x8000_0000, 256 * 1024 * 1024)   # 256 MiB DRAM
@@ -869,10 +1214,15 @@ index 0000000..d71d46a
 +#                ↑          ↑           ↑     ↑       ↑           ↑     ↑
 +#                isa   privilege_levels  vlen hartIDs  mem_layout  ELF  (start_pc optional)
 +
++print("Simulator Instantiated")
 +# print("Initial PC:", hex(sim.get_PC(0)))
 +# for i in range(10):
 +#     sim.single_step(0)
 +#     print(f"{i+1:02}: pc={hex(sim.get_PC(0))}")
+diff --git a/ibex_load_instr_test_0.o b/ibex_load_instr_test_0.o
+new file mode 100755
+index 0000000..f24baf6
+Binary files /dev/null and b/ibex_load_instr_test_0.o differ
 diff --git a/meson.build b/meson.build
 index fd21cba..6b0d603 100644
 --- a/meson.build

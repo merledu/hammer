@@ -68,12 +68,8 @@ int main(int argc, char *argv[]) {
   for (uint32_t i = 0; i < 13; ++i) {
     hammer.single_step(0);
   }
-
-  auto mstatus_opt = hammer.get_csr(0, MSTATUS_CSR);
-  if (!mstatus_opt.has_value()) {
-    printf("Failed to read mstatus CSR\n");
-    exit(1);
-  }
+  
+  reg_t current_mstatus = hammer.get_csr(0, MSTATUS_CSR);
   reg_t current_mstatus = mstatus_opt.value();
   if (current_mstatus != 0x8000000a00002600) {
     printf("Unexpected mstatus: 0x%" PRIx64 "\n", current_mstatus);
