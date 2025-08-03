@@ -39,8 +39,10 @@ def main():
     for i in range(300):
         hart=0
 
-        pc  = sim.get_PC(0)
+        pc  = sim.get_PC(0) & 0xFFFFFFFF  # RV32IMC, so we mask to 32 bits
         insn_hex = sim.get_insn_hex(0, pc)
+        insn_str = sim.get_insn_string(0, pc)
+        # print(dir(insn_str))
         rs1 = sim.get_rs1_addr(0, pc)
         rs2 = sim.get_rs2_addr(0, pc)
         rs3 = sim.get_rs3_addr(0, pc)
@@ -64,6 +66,7 @@ def main():
                 val |= (byte_value << (val_a.index(byte_value) * 8))
         
         print(f"Step {i+1:02d}: pc={pc:#x} insn={insn_hex:#x}")
+        print(f"  insn_str: {insn_str}")
         reg_writes=sim.get_log_reg_writes(0)  # Dump the state of hart 0
         if reg_writes:
             print("=== REGISTER WRITES ===")
@@ -74,12 +77,14 @@ def main():
         if mem_reads and len(mem_reads) > 4:
             print("=== MEMORY READS ===")
             for addr, value, size in mem_reads :
+                addr &= 0xFFFFFFFF  # Mask to 32 bits
                 print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
                 break
         mem_writes=sim.get_log_mem_writes(0)
         if mem_writes:
             print("=== MEMORY WRITES ===")
             for addr, value, size in mem_writes:
+                addr &= 0xFFFFFFFF  # Mask to 32 bits
                 print(f"WRITE ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
         memory_contents = sim.get_memory_at_VA(0, 0x80002000, 4, 1)
         value_at_address = 0

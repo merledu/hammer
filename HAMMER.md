@@ -149,16 +149,16 @@ With the recent updates in Spike, Hammer has been modified to accommodate these 
 
 ## 1. What’s Added in This Fork ?
 
-| Area                                | Change                                                                                                                                              | Why it matters                                                                                                                                                                                                                                                                                           |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Instruction introspection** | `get_insn*` helpers (word, hex, length) & `get_opcode`, `get_rs1_addr`, `get_rs2_addr`, `get_rs3_addr`, `get_rd_addr`, `get_csr_addr` | To get more information about the instruction decoded                                                                                                                                                                                                                                                    |
-| **RVC support**               | `get_rvc_opcode`, `get_rvc_rs*`, `get_rvc_rd_addr`                                                                                            | Same as above but for 16‑bit compressed instructions                                                                                                                                                                                                                                                    |
-| **Commit‑log access**        | `get_log_commits_enabled`, `get_log_reg_writes`, `get_log_mem_reads`, `get_log_mem_writes`                                                  | `<ul><li>`Enables spike to log the instructions`</li><li>`Access register logs to extract register write data and export to interface`</li><li>`Access memory read and write logs to extract memory accesses and export to interface`</li><li>`Enable debugging and trace analysis`</li></ul>` |
-| **CSR access**                | `get_csr` now returns `std::optional<reg_t>`                                                                                                    | `<ul><li>`Avoids crashes on unimplemented CSRs instead of throwing access errors`</li><li>`Flexibility from interface side to check if a CSR instruction was executed or not`</li><li>`Provides a consistent interface for accessing CSR values`</li></ul>`                                      |
-| **Helper**                    | private `get_insn_fetch()`                                                                                                                        | Centralises MMU fetch so helpers stay small                                                                                                                                                                                                                                                              |
-| **Default logging**           | Spike log path now defaults to**`ham.log`** (Can be customised and compiled)                                                                | Easy side‑by‑side core vs. cosim inspection                                                                                                                                                                                                                                                          |
-| **Build system**              | *Meson* tweaks: `-D_GNU_SOURCE`, relaxed unused‑* warnings, removed hard‑wired test dirs                                                      | Builds cleanly with recent Clang/GCC and Spike headers                                                                                                                                                                                                                                                   |
-| **Examples**                  | `hammer_example.py`, `hammer_run.py`                                                                                                            | End‑to‑end demo: load ELF, single‑step, print decoded fields                                                                                                                                                                                                                                          |
+| Area                                | Change                                                                                                                                                       | Why it matters                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Instruction introspection** | `get_insn*` helpers (word, hex, length,string) & `get_opcode`, `get_rs1_addr`, `get_rs2_addr`, `get_rs3_addr`, `get_rd_addr`, `get_csr_addr`  | To get more information about the instruction decoded                                                                                                                                                                                                                                                        |
+| **RVC support**               | `get_rvc_opcode`, `get_rvc_rs*`, `get_rvc_rd_addr`                                                                                                     | Same as above but for 16‑bit compressed instructions                                                                                                                                                                                                                                                        |
+| **Commit‑log access**        | `get_log_commits_enabled`, `get_log_reg_writes`, `get_log_mem_reads`, `get_log_mem_writes`                                                           | `<ul><li>`Enables spike to log the instructions `</li><li>`Access register logs to extract register write data and export to interface `</li><li>`Access memory read and write logs to extract memory accesses and export to interface `</li><li>`Enable debugging and trace analysis `</li></ul>` |
+| **CSR access**                | `get_csr` now returns `std::optional<reg_t>`                                                                                                             | `<ul><li>`Avoids crashes on unimplemented CSRs instead of throwing access errors `</li><li>`Flexibility from interface side to check if a CSR instruction was executed or not `</li><li>`Provides a consistent interface for accessing CSR values `</li></ul>`                                       |
+| **Helper**                    | private `get_insn_fetch()`                                                                                                                                 | Centralises MMU fetch so helpers stay small                                                                                                                                                                                                                                                                  |
+| **Default logging**           | Spike log path now defaults to**`ham.log`** (Can be customised and compiled)                                                                               | Easy side‑by‑side core vs. cosim inspection                                                                                                                                                                                                                                                              |
+| **Build system**              | *Meson* tweaks: `-D_GNU_SOURCE`, relaxed unused‑* warnings, removed hard‑wired test dirs                                                               | Builds cleanly with recent Clang/GCC and Spike headers                                                                                                                                                                                                                                                       |
+| **Examples**                  | `hammer_example.py`, `hammer_run.py`                                                                                                                     | End‑to‑end demo: load ELF, single‑step, print decoded fields                                                                                                                                                                                                                                              |
 
 Files touched:
 
@@ -183,6 +183,7 @@ bool                         get_log_commits_enabled(uint8_t hart);
 insn_t                       get_insn(uint8_t hart, reg_t pc);
 int                          get_insn_length(uint8_t hart, reg_t pc);
 uint64_t                     get_insn_hex(uint8_t hart, reg_t pc);
+std::string 		     get_insn_string(uint8_t hart_id,reg_t pc);
 
 uint64_t                     get_opcode(uint8_t hart, reg_t pc);
 uint64_t                     get_rs1_addr(uint8_t hart, reg_t pc);
@@ -205,12 +206,13 @@ std::optional<reg_t>         get_csr(uint8_t hart, uint32_t csr_id);
  **Observations:** When using `get_log_mem_reads()` , the returned `commit_log_mem_t` length is atleast 4 in all instruction executions. The address it read in my case was the address next to `<kernel_stack_end>`. The reason for this is not very clear, but it seems to be a quirk of the Spike simulator. But if the length is more than 4 , the first instructions that it reads will be the actual memory read instruction, so you can take all the vector pairs except the last four in the returned vector.
 
 ```python
-      mem_reads=sim.get_log_mem_reads(0)
-      if mem_reads and len(mem_reads) > 4:
+        mem_reads=sim.get_log_mem_reads(0)
+        if mem_reads and len(mem_reads) > 4:
             print("=== MEMORY READS ===")
             for addr, value, size in mem_reads :
-              print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
-              break
+                addr &= 0xFFFFFFFF  # Mask to 32 bits
+                print(f"READ ADDRESS: {addr:#x}, VALUE: {value:#x}, SIZE: {size} bytes")
+                break
 ```
 
 ---
@@ -277,7 +279,7 @@ Add the following to your `~/.bashrc` to set the `LD_LIBRARY_PATH` and `builddir
 
 ```bash
 export LD_LIBRARY_PATH=$SPIKE_HOME/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=$HOME/hammer/builddir:$PYTHONPATH
+export PYTHONPATH=path-to-hammer/builddir:$PYTHONPATH
 ```
 
 Then run:

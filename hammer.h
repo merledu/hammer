@@ -10,6 +10,8 @@
 #include "riscv/devices.h"        // device_factory_t
 #include "riscv/mmu.h"
 #include "riscv/sim.h"
+#include "riscv/disasm.h"
+
 
 #include <iostream>
 
@@ -21,7 +23,8 @@ class Hammer {
   ~Hammer();
 
   bool get_log_commits_enabled(uint8_t hart_id);
-
+  
+  std::string get_insn_string(uint8_t hart_id,reg_t pc);
   insn_t get_insn(uint8_t hart_id,reg_t pc);
   int get_insn_length(uint8_t hart_id,reg_t pc);
   insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);

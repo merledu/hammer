@@ -118,6 +118,16 @@ insn_fetch_t Hammer::get_insn_fetch(uint8_t hart_id,reg_t pc){
   return fetch;
 }
 
+std::string Hammer::get_insn_string(uint8_t hart_id,reg_t pc) {
+  processor_t *hart = simulator->get_core(hart_id);
+  mmu_t *mmu = hart->get_mmu();
+  insn_fetch_t fetch = mmu->load_insn(pc);
+  insn_t insn = fetch.insn;
+  const disassembler_t *disasm = hart->get_disassembler();
+  std::string insn_str = disasm->disassemble(insn);
+  return insn_str;
+}
+
 insn_t Hammer::get_insn(uint8_t hart_id,reg_t pc){
   return get_insn_fetch(hart_id,pc).insn;
 }
@@ -250,7 +260,7 @@ commit_log_mem_t Hammer::get_log_mem_reads(uint8_t hart_id){
     //address,data,size
     for (auto item : load) {
       // item is a tuple: <address, value, size>
-      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
+      reg_t addr = std::get<0>(item);
       uint64_t value = std::get<1>(item);
       uint8_t size = std::get<2>(item);
       
@@ -274,7 +284,7 @@ commit_log_mem_t Hammer::get_log_mem_writes(uint8_t hart_id){
     //address,data,size
     for (auto item : store) {
       // item is a tuple: <address, value, size>
-      reg_t addr = std::get<0>(item) & 0xFFFFFFFF;
+      reg_t addr = std::get<0>(item);
       uint64_t value = std::get<1>(item);
       uint8_t size = std::get<2>(item);
       
@@ -319,7 +329,7 @@ reg_t Hammer::get_PC(uint8_t hart_id) {
   processor_t *hart = simulator->get_core(hart_id);
   state_t *hart_state = hart->get_state();
 
-  return hart_state->pc  & 0xFFFFFFFF;
+  return hart_state->pc;
 }
 
 void Hammer::set_PC(uint8_t hart_id, reg_t new_pc_value) {

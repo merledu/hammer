@@ -20,8 +20,9 @@ PYBIND11_MODULE(hammer, m) {
                           const std::optional<uint64_t>>())
       .def("hello_world", &Hammer::hello_world)
       .def("get_log_commits_enabled",&Hammer::get_log_commits_enabled)
-
+      
       .def("get_insn_hex",&Hammer::get_insn_hex)
+      .def("get_insn_string",&Hammer::get_insn_string)
       .def("get_insn",&Hammer::get_insn)
       .def("get_insn_length",&Hammer::get_insn_length)
       .def("get_opcode",&Hammer::get_opcode)
