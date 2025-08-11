@@ -65,7 +65,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
   // cfg.bootargs         = bootargs;
   cfg.isa              = isa;
   cfg.priv             = privilege_levels;
-  // cfg.misaligned       = misaligned;
+  cfg.misaligned       = true; 
   // cfg.endianness       = endinaness;
   // cfg.pmpregions       = num_pmpregions;
   // cfg.pmpgranularity   = pmpgranularity;
