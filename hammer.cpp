@@ -37,7 +37,7 @@ Hammer::Hammer(const char *isa, const char *privilege_levels, const char *vector
                                      .support_abstract_csr_access = true,
                                      .support_haltgroups = true,
                                      .support_impebreak = true};
-  const char *log_path = "../ham.log";
+  const char *log_path = "../../hammer.log";
   const char *dtb_file = nullptr;
   FILE *cmd_file = nullptr;
 
