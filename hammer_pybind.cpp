@@ -6,6 +6,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+namespace py = pybind11;
 
 PYBIND11_MODULE(hammer, m) {
   m.doc() = "Hammer Python Interface";
@@ -19,6 +20,30 @@ PYBIND11_MODULE(hammer, m) {
                           std::vector<mem_cfg_t>, const std::string,
                           const std::optional<uint64_t>>())
       .def("hello_world", &Hammer::hello_world)
+      .def("get_log_commits_enabled",&Hammer::get_log_commits_enabled)
+      
+      .def("get_insn_hex",&Hammer::get_insn_hex)
+      .def("get_insn_string",&Hammer::get_insn_string)
+      .def("get_insn",&Hammer::get_insn)
+      .def("get_insn_length",&Hammer::get_insn_length)
+      .def("get_opcode",&Hammer::get_opcode)
+      .def("get_rs1_addr",&Hammer::get_rs1_addr)
+      .def("get_rs2_addr",&Hammer::get_rs2_addr)
+      .def("get_rs3_addr",&Hammer::get_rs3_addr)
+      .def("get_rd_addr",&Hammer::get_rd_addr)
+      .def("get_csr_addr",&Hammer::get_csr_addr)
+
+      //RVC
+      .def("get_rvc_opcode",&Hammer::get_rvc_opcode)
+      .def("get_rvc_rs1_addr",&Hammer::get_rvc_rs1_addr)
+      .def("get_rvc_rs2_addr",&Hammer::get_rvc_rs2_addr)
+      .def("get_rvc_rd_addr",&Hammer::get_rvc_rd_addr)
+        
+      .def("get_log_reg_writes",&Hammer::get_log_reg_writes)
+      .def("get_log_mem_reads",&Hammer::get_log_mem_reads)
+      .def("get_log_mem_writes",&Hammer::get_log_mem_writes)
+
+      
       .def("get_gpr", &Hammer::get_gpr)
       .def("set_gpr", &Hammer::set_gpr)
       .def("get_fpr", &Hammer::get_fpr)

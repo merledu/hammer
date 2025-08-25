@@ -3,10 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
-
+// #define _GNU_SOURCE        // redundant but harmless alongside the -D flag
+#include <sys/syscall.h>   // brings in SYS_futex on glibc
+// #include <linux/futex.h>   // (optional) gives FUTEX_* enums if you ever need them 
 #include "hammer_enums.h"
+#include "riscv/devices.h"        // device_factory_t
 #include "riscv/mmu.h"
 #include "riscv/sim.h"
+#include "riscv/disasm.h"
+
 
 #include <iostream>
 
@@ -17,6 +22,32 @@ class Hammer {
          const std::string target_binary, const std::optional<uint64_t> start_pc = std::nullopt);
   ~Hammer();
 
+  bool get_log_commits_enabled(uint8_t hart_id);
+  
+  std::string get_insn_string(uint8_t hart_id,reg_t pc);
+  insn_t get_insn(uint8_t hart_id,reg_t pc);
+  int get_insn_length(uint8_t hart_id,reg_t pc);
+  insn_bits_t get_insn_hex(uint8_t hart_id,reg_t pc);
+  u_int64_t get_opcode(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs1_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs2_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rs3_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rd_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_csr_addr(uint8_t hart_id,reg_t pc);
+  
+  //RVC instructions
+  u_int64_t get_rvc_opcode(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rs1_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rs2_addr(uint8_t hart_id,reg_t pc);
+  u_int64_t get_rvc_rd_addr(uint8_t hart_id,reg_t pc);
+  
+  // Detailed register write logging (like Spike's commit log)
+  std::vector<std::pair<std::string, uint64_t>> get_log_reg_writes(uint8_t hart_id);
+  commit_log_mem_t get_log_mem_reads(uint8_t hart_id);
+  commit_log_mem_t get_log_mem_writes(uint8_t hart_id);
+  
+  
+  
   reg_t get_gpr(uint8_t hart_id, uint8_t gpr_id);
   void set_gpr(uint8_t hart_id, uint8_t gpr_id, reg_t new_gpr_value);
 
@@ -25,7 +56,7 @@ class Hammer {
   reg_t get_PC(uint8_t hart_id);
   void set_PC(uint8_t hart_id, reg_t new_pc_value);
 
-  reg_t get_csr(uint8_t hart_id, uint32_t csr_id);
+  std::optional<reg_t> get_csr(uint8_t hart_id, uint32_t csr_id);
 
   void single_step(uint8_t hart_id);
 
@@ -71,4 +102,5 @@ class Hammer {
 
  private:
   sim_t *simulator;
+  insn_fetch_t get_insn_fetch(uint8_t hart_id,reg_t pc);
 };

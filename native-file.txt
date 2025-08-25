@@ -4,6 +4,11 @@
 
 # GCC has trouble with some of the compiler flags so use clang instead.
 
+#[binaries]
+#cc = 'clang'
+#cpp = 'clang++'
 [binaries]
-cc = 'clang'
-cpp = 'clang++'
+c   = '/usr/bin/gcc'
+cpp = '/usr/bin/g++'
+ar  = '/usr/bin/ar'
+strip = '/usr/bin/strip'

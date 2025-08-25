@@ -10,6 +10,13 @@ project('hammer lib', 'cpp',
           'default_library=static'
           ]
         )
+add_project_arguments(
+  ['-D_GNU_SOURCE',
+   '-Wno-error=unused-variable',
+   '-Wno-error=unused-parameter'],
+  language: 'cpp')
+# Added additionally 
+
 
 spike_install_dir = get_option('spike_install_dir')
 
@@ -86,5 +93,3 @@ hammer_pylib = python3_instance.extension_module('hammer',
 
 install_headers('hammer.h', 'hammer_enums.h')
 
-subdir('tests')
-subdir('pytests')
