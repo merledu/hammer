@@ -313,11 +313,19 @@ python3 hammer_example.py ./ibex_load_instr_test_0.o
 
 Expect a short trace of `PC`, raw instruction, decoded opcode, plus an updated `ham.log` commit log.
 
+To run a cpp test 
+
+```cpp
+g++ -std=c++20 -I$SPIKE_HOME/include -I$SPIKE_HOME/include/softfloat -I $SPIKE_HOME/include/fesvr -I. hammer_test_1.cpp <path-to-hammer>/builddir/libhammer.a -L$SPIKE_HOME/lib -lriscv -o my_hammer_test
+
+ ./my_hammer_test ./ibex_load_instr_test_0.o 
+```
+
 ---
 
 ## 6 · Known Limitations
 
-* Only tested on **RV32IMC**; RV64 helpers compile but lack CI.
+* nly tested on **RV32IMC**; RV64 helpers compile but lack CI.
 * Memory helpers show the last address/data pair seen by the MMU this cycle; concurrent load‑store contention on multi‑harts is **not** exposed yet.
 * CSR access returns `None` if Spike was compiled without that CSR – handle it.
 
