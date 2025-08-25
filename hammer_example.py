@@ -10,7 +10,7 @@ Make sure:
   * The `hammer` extension (built with Meson) is discoverable in PYTHONPATH or installed.
 """
 
-import sys
+import sys,os
 import hammer
 
 def main():
@@ -20,7 +20,11 @@ def main():
 
     elf = sys.argv[1]
     print(f"Loading ELF: {elf}")
-
+    print(f"hammer module: {hammer.__file__}")
+    print(f"PYTHON: {sys.executable}")
+    print(f"LD_LIBRARY_PATH={os.environ.get('LD_LIBRARY_PATH','<unset>')}")
+    print(f"PYTHONPATH={os.environ.get('PYTHONPATH','<unset>')}")
+    print(f"CWD={os.getcwd()}")
     mem_cfg = hammer.mem_cfg_t(hammer.DramBase, 256 * 1024 * 1024)
 
     sim = hammer.Hammer(
@@ -32,10 +36,11 @@ def main():
         elf,                # arg5: target_binary
         None                # arg6: start_pc (optional)
     )
+    print(type(sim))
 
     print("Initial PC:", hex(sim.get_PC(0)))
 
-    # Step through first 10 instructions
+    # Step through few instructions
     for i in range(300):
         hart=0
 
@@ -58,7 +63,6 @@ def main():
         sim.single_step(0)
         
 
-        a0  = sim.get_gpr(0, 10)   # x10/a0
         val_a = sim.get_memory_at_VA(0, 0x8000bc48, 4, 1)
         val = 0
         if val_a is not None:
